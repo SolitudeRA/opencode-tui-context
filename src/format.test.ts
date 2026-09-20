@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import type { Segment, SegmentId } from "./types"
-import { formatBar, formatCompact, formatCost, formatPercent, formatTokens } from "./format"
+import { formatBar, formatCompact, formatPercent, formatTokens } from "./format"
 
 type Cells = ReadonlyArray<{ id: SegmentId; cells: number }>
 
@@ -34,14 +34,6 @@ test("formats percentages as bare integer strings", () => {
   expect(formatPercent(50)).toBe("50%")
   expect(formatPercent(0)).toBe("0%")
   expect(formatPercent(100)).toBe("100%")
-})
-
-test("formats costs as USD with exactly four decimal places", () => {
-  const tiny = formatCost(0.002522688)
-  expect(tiny.startsWith("$")).toBe(true)
-  expect(tiny).toBe("$0.0025")
-  expect(tiny.split(".")[1]?.length).toBe(4)
-  expect(formatCost(12.5)).toBe("$12.5000")
 })
 
 test("allocates the full width and keeps the free remainder when free is present", () => {

@@ -3,14 +3,6 @@ import type { Segment, SegmentId } from "./types"
 // Baseline formatters (tui.js:181-183): plain integer and compact number formats.
 const tokenFmt = new Intl.NumberFormat("en-US")
 const compactFmt = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 })
-// Deliberate baseline deviation: 4 decimals instead of the baseline's default 2, because real
-// session costs such as 0.002522688 would render as "$0.00" and hide the usage entirely.
-const costFmt = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 4,
-  maximumFractionDigits: 4,
-})
 
 export function formatTokens(n: number): string {
   return tokenFmt.format(n)
@@ -22,10 +14,6 @@ export function formatCompact(n: number): string {
 
 export function formatPercent(n: number): string {
   return `${n}%`
-}
-
-export function formatCost(usd: number): string {
-  return costFmt.format(usd)
 }
 
 /**

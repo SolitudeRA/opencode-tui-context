@@ -7,7 +7,6 @@
 - 在侧边栏渲染一条宽度可配的分段条，每一段对应一类 token 占用。
 - 条下方给出字母图例：每个出现的段一个字母，外加该段的紧凑计数。
 - 给出百分比占用，以及 `已用 / 窗口` 的 token 总数。
-- 可选显示本次会话的累计花费。
 - 会话有新消息时自动刷新：订阅 `message.updated`、`message.part.updated`、`session.updated`、`session.idle` 四个事件，重绘做 50ms 前置节流；卸载时清理全部订阅，不用定时轮询。
 - 还没有 assistant 消息时显示 `no assistant turns yet`，不是空白，也不报错。
 
@@ -28,9 +27,9 @@
 
 颜色 token 就是宿主主题里的字段名，取值来自 `api.theme.current.<token>`。
 
-条的字符是 `━`（U+2501），每一段按分到的格数重复该字符并染上对应颜色。图例的标记是 `▍`（U+258D），后面紧跟一个小写字母：`c`、`p`、`t`、`o`、`r`、`f`，分别对应上表的六个 segment id。字母用所属段的颜色着色，紧跟的紧凑计数（如 `17.4K`）统一用 `textMuted`。
+面板最外层有一条 `borderSubtle` 色的边框，左右各留一列内边距，`Context` 标题在框内顶行。条用点阵字符绘制：占用段是实心 `▓`（U+2593），`free` 段是空心 `░`（U+2591），每一段按分到的格数重复对应字符并染上该段颜色。图例的标记是 `▍`（U+258D），后面紧跟一个小写字母：`c`、`p`、`t`、`o`、`r`、`f`，分别对应上表的六个 segment id。字母用所属段的颜色着色，紧跟的紧凑计数（如 `17.4K`）统一用 `textMuted`。
 
-被 `exclude` 排除的段不会出现，字母与计数一并消失。百分比行的颜色随占用分档：`>= 100` 用 `error`，`>= 75` 用 `warning`，`>= 50` 用 `accent`，其余用 `success`。花费一行固定显示四位小数（例如 `$0.0025`），这是有意的选择：会话早期成本很小，如果只留两位小数就会全部显示成 `$0.00`，真实用量反而看不见。
+被 `exclude` 排除的段不会出现，字母与计数一并消失。百分比行的颜色随占用分档：`>= 100` 用 `error`，`>= 75` 用 `warning`，`>= 50` 用 `accent`，其余用 `success`。条的总列数由面板实测宽度决定，会跟随实际可用宽度自适应：面板变宽时条随之变长，侧边栏收窄时条随之缩短，不会换行，右侧的百分比照常显示。
 
 ## 安装
 
@@ -76,7 +75,7 @@ cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
   "plugin": [
     [
       "opencode-tui-context@latest",
-      { "barWidth": 40, "exclude": ["free"], "showCost": false, "showLegend": true }
+      { "barWidth": 40, "exclude": ["free"], "showLegend": true }
     ]
   ]
 }
@@ -84,9 +83,8 @@ cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 
 | 选项 | 默认值 | 规则与回退 |
 | --- | --- | --- |
-| `barWidth` | `32` | 条的字符宽度。先四舍五入，再夹到 `8-120`。非数字或非有限值（`NaN`、`±Infinity`）回退到 `32`；`0` 会被夹到 `8`，`999` 夹到 `120`。 |
+| `barWidth` | `24` | 面板实测宽度出来之前的初始条宽（字符数）。先四舍五入，再夹到 `8-120`。非数字或非有限值（`NaN`、`±Infinity`）回退到 `24`；`0` 会被夹到 `8`，`999` 夹到 `120`。首帧之后条宽由面板实测宽度决定并自动跟随，`barWidth` 只在尚未测量时兜底。 |
 | `exclude` | `[]` | 要从条与图例里隐藏的 segment id 列表。只接受 `cached`、`prompt`、`think`、`out`、`reserved`、`free` 六个值，非法值被丢掉，重复值去重并保留首次出现的顺序。非数组回退到 `[]`。 |
-| `showCost` | `true` | 是否显示本次会话累计花费那一行。非布尔值回退到 `true`。 |
 | `showLegend` | `true` | 是否显示 `▍` 字母图例行。非布尔值回退到 `true`。设为 `false` 时只隐藏图例，条与百分比保留。 |
 
 所有选项都经过规范化。配置缺省、为 `null`、类型不对，甚至整个选项对象根本不是对象，都不会抛错，一律回退到上表默认值。

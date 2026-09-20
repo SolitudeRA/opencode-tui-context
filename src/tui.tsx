@@ -5,7 +5,7 @@ import { createSignal } from "solid-js"
 import { formatBar, formatCompact, formatCost, formatPercent, formatTokens } from "./format"
 import { parseOptions } from "./options"
 import type { PluginOptions_, SegmentId, Usage, UsageLimits } from "./types"
-import { computeUsage, lastAssistantWithTokens } from "./usage"
+import { computeUsage, lastAssistantWithTokens, type AssistantUsage } from "./usage"
 
 // Bar glyph, legend marker and slot order are fixed by the plan (baseline order: 150; this plugin takes 60).
 const BAR_CELL = "\u2501"
@@ -16,6 +16,9 @@ const REPAINT_INTERVAL_MS = 50
 // verification probe (plan task 13 acceptance) — safe to remove after QA.
 // Absolute on purpose: opencode loads this plugin from its own process, whose cwd is not the project root.
 const EVENT_PROBE_PATH = "/mnt/e/Coding/opencode-context-monitor/verification/13-events.log"
+// verification probe (plan task 20) — temporary, safe to remove after QA.
+// Absolute for the same reason as EVENT_PROBE_PATH.
+const RENDER_PROBE_PATH = "/mnt/e/Coding/opencode-context-monitor/verification/20-slot-trace.log"
 
 type ResolvedOptions = Required<PluginOptions_>
 type Theme = TuiPluginApi["theme"]["current"]
@@ -97,30 +100,71 @@ function usageLines(api: TuiPluginApi, usage: Usage, config: ResolvedOptions) {
   )
 }
 
-function Panel(props: { api: TuiPluginApi; sessionId: string; config: ResolvedOptions }) {
-  const theme = () => props.api.theme.current
-  const usage = (): Usage | undefined => {
-    const assistant = lastAssistantWithTokens(props.api.state.session.messages(props.sessionId))
-    if (assistant === undefined) return undefined
-    const limits = modelLimits(props.api.state.provider, assistant.providerID, assistant.modelID)
-    return computeUsage({
-      tokens: assistant.tokens,
-      ...(limits === undefined ? {} : { limits }),
-      cost: props.api.state.session.get(props.sessionId)?.cost ?? 0,
-      exclude: props.config.exclude,
-    })
-  }
+/** Computes the usage snapshot of the last assistant turn that carries output tokens. */
+function sessionUsage(
+  api: TuiPluginApi,
+  sessionId: string,
+  assistant: AssistantUsage,
+  config: ResolvedOptions,
+): Usage {
+  const limits = modelLimits(api.state.provider, assistant.providerID, assistant.modelID)
+  return computeUsage({
+    tokens: assistant.tokens,
+    ...(limits === undefined ? {} : { limits }),
+    cost: api.state.session.get(sessionId)?.cost ?? 0,
+    exclude: config.exclude,
+  })
+}
 
-  const current = usage()
+// Temporary render trace (plan task 20): the ordinal resets per process start and a line is written
+// only when the (messages.length, found, used) tuple changes, so it can never spam one line per frame.
+let renderOrdinal = 0
+let lastRenderTuple = ""
+let resolvedSolidModule: string | undefined
+
+function solidModuleSpecifier(): string {
+  if (resolvedSolidModule !== undefined) return resolvedSolidModule
+  try {
+    resolvedSolidModule = typeof import.meta.resolve === "function" ? import.meta.resolve("solid-js") : "no-import-meta-resolve"
+  } catch {
+    resolvedSolidModule = "resolve-failed"
+  }
+  return resolvedSolidModule
+}
+
+function recordRenderProbe(messages: number, usage: Usage | undefined): void {
+  renderOrdinal += 1
+  const used = usage === undefined ? "-" : String(usage.used)
+  const tuple = `${messages}|${usage !== undefined}|${used}`
+  if (tuple === lastRenderTuple) return
+  lastRenderTuple = tuple
+  try {
+    appendFileSync(
+      RENDER_PROBE_PATH,
+      `${new Date().toISOString()} render n=${renderOrdinal} messages=${messages} found=${usage !== undefined} used=${used} sol=${solidModuleSpecifier()}\n`,
+    )
+  } catch {
+    // A missing probe directory on another machine must never break the panel.
+  }
+}
+
+/** Builds the panel element tree for one usage snapshot. Deliberately a plain function: the slot body
+ *  calls it directly, so every slot re-run rebuilds the tree and re-reads the session data. */
+function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptions) {
+  const theme = api.theme.current
+  const messages = api.state.session.messages(sessionId)
+  const assistant = lastAssistantWithTokens(messages)
+  const usage = assistant === undefined ? undefined : sessionUsage(api, sessionId, assistant, config)
+  recordRenderProbe(messages.length, usage)
   return (
     <box flexDirection="column" gap={1}>
-      <text fg={theme().text}>
+      <text fg={theme.text}>
         <b>Context</b>
       </text>
-      {current === undefined ? (
-        <text fg={theme().textMuted}>no assistant turns yet</text>
+      {usage === undefined ? (
+        <text fg={theme.textMuted}>no assistant turns yet</text>
       ) : (
-        usageLines(props.api, current, props.config)
+        usageLines(api, usage, config)
       )}
     </box>
   )
@@ -176,7 +220,7 @@ const tui: TuiPlugin = async (api, options) => {
     slots: {
       sidebar_content(_ctx, props) {
         tick()
-        return <Panel api={api} sessionId={props.session_id} config={config} />
+        return renderPanel(api, props.session_id, config)
       },
     },
   })

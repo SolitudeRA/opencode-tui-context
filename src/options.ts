@@ -1,6 +1,6 @@
 import type { PluginOptions_, SegmentId } from "./types"
 
-const DEFAULT_BAR_WIDTH = 32
+const DEFAULT_BAR_WIDTH = 24
 const MIN_BAR_WIDTH = 8
 const MAX_BAR_WIDTH = 120
 
@@ -43,7 +43,6 @@ export function parseOptions(raw: unknown): Required<PluginOptions_> {
   return {
     barWidth: parseBarWidth(options.barWidth),
     exclude: parseExclude(options.exclude),
-    showCost: parseBoolean(options.showCost, true),
     showLegend: parseBoolean(options.showLegend, true),
   }
 }

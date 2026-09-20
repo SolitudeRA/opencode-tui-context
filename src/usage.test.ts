@@ -9,7 +9,6 @@ const realCounts: TokenCounts = { input: 16348, output: 101, reasoning: 12, cach
 const realMessage = {
   role: "assistant",
   tokens: { total: 17357, input: 16348, output: 101, reasoning: 12, cache: { write: 0, read: 896 } },
-  cost: 0.002522688,
   modelID: "deepseek-flash",
   providerID: "deepseek",
 }
@@ -90,8 +89,8 @@ test("computes the exact used total for the real deepseek sample", () => {
       realMessage,
       { role: "user", tokens: { input: 10, output: 5 } },
     ]),
-  ).toEqual({ tokens: realCounts, providerID: "deepseek", modelID: "deepseek-flash", cost: 0.002522688 })
-  const usage: Usage = computeUsage({ tokens: counts, cost: realMessage.cost })
+  ).toEqual({ tokens: realCounts, providerID: "deepseek", modelID: "deepseek-flash" })
+  const usage: Usage = computeUsage({ tokens: counts })
   expect(usage.used).toBe(16348 + 896 + 0 + 12 + 101)
   expect(usage.used).toBe(17357)
 })

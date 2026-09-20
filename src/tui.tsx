@@ -1,17 +1,29 @@
 /** @jsxImportSource @opentui/solid */
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
-import { createSignal } from "solid-js"
-import { formatBar, formatCompact, formatCost, formatPercent, formatTokens } from "./format"
+import type { BoxRenderable } from "@opentui/core"
+import { createEffect, createSignal } from "solid-js"
+import { formatBar, formatCompact, formatPercent, formatTokens } from "./format"
 import { parseOptions } from "./options"
 import type { PluginOptions_, SegmentId, Usage, UsageLimits } from "./types"
 import { computeUsage, lastAssistantWithTokens, type AssistantUsage } from "./usage"
 
-// Bar glyph, legend marker and slot order are fixed by the plan (baseline order: 150; this plugin takes 60).
-const BAR_CELL = "\u2501"
+// Bar glyphs, legend marker and slot order are fixed by the plan (baseline order: 150; this plugin takes 60).
+const BAR_FILLED = "\u2593"
+const BAR_EMPTY = "\u2591"
 const LEGEND_MARK = "\u258D"
 const SLOT_ORDER = 60
 // Minimum spacing between two repaints (plan task 13; baseline throttle is `tui.js:210-224`).
 const REPAINT_INTERVAL_MS = 50
+
+// Measured outer width of the panel box, in columns. Module scope on purpose: every tick rebuilds
+// the whole tree (no fine-grained reactivity — notepad T11), so a per-build signal would reset
+// before anything could read it. `config.barWidth` only seeds this until the box reports a size
+// (same role as visual-cache `DEFAULT_PANEL_WIDTH`, index.tsx:476).
+const [panelWidth, setPanelWidth] = createSignal(24)
+/** Bar cells available inside the frame: 1 border + 1 padding column on each side. */
+const effectiveWidth = () => Math.max(8, panelWidth() - 2 - 2)
+/** Latest mounted panel box; written by `ref`, read by `onSizeChange` and the resync effect. */
+let panelBox: BoxRenderable | undefined
 
 type ResolvedOptions = Required<PluginOptions_>
 type Theme = TuiPluginApi["theme"]["current"]
@@ -65,13 +77,15 @@ function modelLimits(
 /** Renders the coloured bar, gated legend, tiered percent and totals for one usage snapshot. */
 function usageLines(api: TuiPluginApi, usage: Usage, config: ResolvedOptions) {
   const theme = api.theme.current
-  const bar = formatBar(usage.segments, usage.window, config.barWidth, config.exclude)
+  const bar = formatBar(usage.segments, usage.window, effectiveWidth(), config.exclude)
   const tokensById = new Map(usage.segments.map((segment) => [segment.id, segment.tokens]))
   return (
     <box flexDirection="column" gap={1}>
       <box flexDirection="row">
         {bar.map((entry) => (
-          <text fg={segmentColor(entry.id, theme)}>{BAR_CELL.repeat(entry.cells)}</text>
+          <text fg={segmentColor(entry.id, theme)}>
+            {(entry.id === "free" ? BAR_EMPTY : BAR_FILLED).repeat(entry.cells)}
+          </text>
         ))}
       </box>
       {config.showLegend ? (
@@ -88,7 +102,6 @@ function usageLines(api: TuiPluginApi, usage: Usage, config: ResolvedOptions) {
       <text fg={theme.textMuted}>
         {`${formatTokens(usage.used)} / ${usage.known ? formatTokens(usage.window) : "--"} tokens`}
       </text>
-      {config.showCost ? <text fg={theme.textMuted}>{`${formatCost(usage.cost)} spent`}</text> : null}
     </box>
   )
 }
@@ -104,7 +117,6 @@ function sessionUsage(
   return computeUsage({
     tokens: assistant.tokens,
     ...(limits === undefined ? {} : { limits }),
-    cost: api.state.session.get(sessionId)?.cost ?? 0,
     exclude: config.exclude,
   })
 }
@@ -117,7 +129,21 @@ function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptio
   const assistant = lastAssistantWithTokens(messages)
   const usage = assistant === undefined ? undefined : sessionUsage(api, sessionId, assistant, config)
   return (
-    <box flexDirection="column" gap={1}>
+    <box
+      flexDirection="column"
+      gap={1}
+      border
+      borderColor={theme.borderSubtle}
+      paddingLeft={1}
+      paddingRight={1}
+      ref={(element) => {
+        panelBox = element
+      }}
+      onSizeChange={() => {
+        const w = panelBox?.width
+        if (typeof w === "number" && Number.isFinite(w) && w > 0) setPanelWidth(w)
+      }}
+    >
       <text fg={theme.text}>
         <b>Context</b>
       </text>
@@ -132,9 +158,19 @@ function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptio
 
 const tui: TuiPlugin = async (api, options) => {
   const config = parseOptions(options)
+  // `barWidth` is only the pre-measurement starting width; the box measurement replaces it.
+  setPanelWidth(config.barWidth)
   // The tick signal is the repaint trigger: reading it in the slot body subscribes this panel to
   // the throttled refresh wired below to the session event bus.
   const [tick, setTick] = createSignal(0)
+
+  // Mirror of visual-cache (index.tsx:972-981): `onSizeChange` alone can miss (re)mount cycles,
+  // so resync from the live box after every repaint — `tick` is this bundle's rebuild trigger.
+  createEffect(() => {
+    tick()
+    const w = panelBox?.width
+    if (typeof w === "number" && Number.isFinite(w) && w > 0) setPanelWidth(w)
+  })
 
   const repaint = () => {
     // The signal bump re-runs the slot body (this bundle has no fine-grained reactivity — see

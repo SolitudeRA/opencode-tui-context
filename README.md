@@ -105,7 +105,6 @@ percent  = min(100, round(used / window * 100))
 几点说明：
 
 - 被测量的对象是会话里最新的一条携带 `tokens.output > 0` 的 assistant 消息。从消息列表尾部往前找，第一条同时满足 `role === "assistant"` 与 `tokens.output > 0` 的消息就是数据源。
-- `cost` 取自会话本身（`session.get(id).cost`），不是从单条消息累加出来的。
 - 当 `window` 为 `0`（模型限额拿不到）时，`free` 与 `percent` 都取 `0`，token 总数一行显示 `--` 作为窗口。
 - `reserved` 只在 `limit.output > 0` 时计算，否则为 `0`。
 - 条里每一段的格数按 `round(段 token / window * barWidth)` 分配，总和不超过 `barWidth`，剩下的余量补成末尾的 `free` 段（除非 `free` 在 `exclude` 里）。

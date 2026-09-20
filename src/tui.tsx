@@ -1,5 +1,4 @@
 /** @jsxImportSource @opentui/solid */
-import { appendFileSync } from "node:fs"
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import { createSignal } from "solid-js"
 import { formatBar, formatCompact, formatCost, formatPercent, formatTokens } from "./format"
@@ -13,12 +12,6 @@ const LEGEND_MARK = "\u258D"
 const SLOT_ORDER = 60
 // Minimum spacing between two repaints (plan task 13; baseline throttle is `tui.js:210-224`).
 const REPAINT_INTERVAL_MS = 50
-// verification probe (plan task 13 acceptance) — safe to remove after QA.
-// Absolute on purpose: opencode loads this plugin from its own process, whose cwd is not the project root.
-const EVENT_PROBE_PATH = "/mnt/e/Coding/opencode-context-monitor/verification/13-events.log"
-// verification probe (plan task 20) — temporary, safe to remove after QA.
-// Absolute for the same reason as EVENT_PROBE_PATH.
-const RENDER_PROBE_PATH = "/mnt/e/Coding/opencode-context-monitor/verification/20-slot-trace.log"
 
 type ResolvedOptions = Required<PluginOptions_>
 type Theme = TuiPluginApi["theme"]["current"]
@@ -116,38 +109,6 @@ function sessionUsage(
   })
 }
 
-// Temporary render trace (plan task 20): the ordinal resets per process start and a line is written
-// only when the (messages.length, found, used) tuple changes, so it can never spam one line per frame.
-let renderOrdinal = 0
-let lastRenderTuple = ""
-let resolvedSolidModule: string | undefined
-
-function solidModuleSpecifier(): string {
-  if (resolvedSolidModule !== undefined) return resolvedSolidModule
-  try {
-    resolvedSolidModule = typeof import.meta.resolve === "function" ? import.meta.resolve("solid-js") : "no-import-meta-resolve"
-  } catch {
-    resolvedSolidModule = "resolve-failed"
-  }
-  return resolvedSolidModule
-}
-
-function recordRenderProbe(messages: number, usage: Usage | undefined): void {
-  renderOrdinal += 1
-  const used = usage === undefined ? "-" : String(usage.used)
-  const tuple = `${messages}|${usage !== undefined}|${used}`
-  if (tuple === lastRenderTuple) return
-  lastRenderTuple = tuple
-  try {
-    appendFileSync(
-      RENDER_PROBE_PATH,
-      `${new Date().toISOString()} render n=${renderOrdinal} messages=${messages} found=${usage !== undefined} used=${used} sol=${solidModuleSpecifier()}\n`,
-    )
-  } catch {
-    // A missing probe directory on another machine must never break the panel.
-  }
-}
-
 /** Builds the panel element tree for one usage snapshot. Deliberately a plain function: the slot body
  *  calls it directly, so every slot re-run rebuilds the tree and re-reads the session data. */
 function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptions) {
@@ -155,7 +116,6 @@ function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptio
   const messages = api.state.session.messages(sessionId)
   const assistant = lastAssistantWithTokens(messages)
   const usage = assistant === undefined ? undefined : sessionUsage(api, sessionId, assistant, config)
-  recordRenderProbe(messages.length, usage)
   return (
     <box flexDirection="column" gap={1}>
       <text fg={theme.text}>
@@ -193,23 +153,15 @@ const tui: TuiPlugin = async (api, options) => {
     repaint()
   }
 
-  // verification probe (plan task 13 acceptance) — safe to remove after QA
-  let delivered = 0
-  const onSessionEvent = (type: string) => {
-    delivered += 1
-    try {
-      appendFileSync(EVENT_PROBE_PATH, `${new Date().toISOString()} event=${type} n=${delivered}\n`)
-    } catch {
-      // A missing probe directory on another machine must never break the panel.
-    }
+  const onSessionEvent = () => {
     throttledRepaint()
   }
 
   const unsubs: Array<() => void> = [
-    api.event.on("message.updated", (event) => onSessionEvent(event.type)),
-    api.event.on("message.part.updated", (event) => onSessionEvent(event.type)),
-    api.event.on("session.updated", (event) => onSessionEvent(event.type)),
-    api.event.on("session.idle", (event) => onSessionEvent(event.type)),
+    api.event.on("message.updated", onSessionEvent),
+    api.event.on("message.part.updated", onSessionEvent),
+    api.event.on("session.updated", onSessionEvent),
+    api.event.on("session.idle", onSessionEvent),
   ]
   api.lifecycle.onDispose(() => {
     for (const unsubscribe of unsubs) unsubscribe()

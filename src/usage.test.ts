@@ -4,13 +4,6 @@ import { computeUsage, lastAssistantWithTokens, tokensOf } from "./usage"
 
 const zeroCounts: TokenCounts = { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }
 
-type PickedAssistant = { tokens: TokenCounts; providerID?: string; modelID?: string; cost?: number }
-
-// Red-phase stub returns `never`, which trips bun:test's `undefined` matcher overload — this restores the real signature.
-function pickAssistant(messages: readonly unknown[]): PickedAssistant | undefined {
-  return lastAssistantWithTokens(messages)
-}
-
 const realCounts: TokenCounts = { input: 16348, output: 101, reasoning: 12, cacheRead: 896, cacheWrite: 0 }
 
 const realMessage = {
@@ -26,7 +19,7 @@ test("reports unknown usage when no assistant message carries output tokens", ()
     { role: "user", tokens: { input: 120, output: 0 } },
     { role: "assistant", tokens: { input: 40, output: 0 } },
   ]
-  expect(pickAssistant(messages)).toBeUndefined()
+  expect(lastAssistantWithTokens(messages)).toBeUndefined()
   const usage: Usage = computeUsage({ tokens: zeroCounts })
   expect(usage.used).toBe(0)
   expect(usage.percent).toBe(0)
@@ -92,7 +85,7 @@ test("computes the exact used total for the real deepseek sample", () => {
   const counts: TokenCounts = tokensOf(realMessage)
   expect(counts).toEqual(realCounts)
   expect(
-    pickAssistant([
+    lastAssistantWithTokens([
       { role: "assistant", tokens: { input: 999, output: 0 } },
       realMessage,
       { role: "user", tokens: { input: 10, output: 5 } },

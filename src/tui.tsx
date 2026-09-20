@@ -1,16 +1,51 @@
 /** @jsxImportSource @opentui/solid */
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import { createSignal } from "solid-js"
-import { formatBar, formatCost, formatPercent, formatTokens } from "./format"
+import { formatBar, formatCompact, formatCost, formatPercent, formatTokens } from "./format"
 import { parseOptions } from "./options"
-import type { PluginOptions_, Usage, UsageLimits } from "./types"
+import type { PluginOptions_, SegmentId, Usage, UsageLimits } from "./types"
 import { computeUsage, lastAssistantWithTokens } from "./usage"
 
-// Bar glyph and slot order are fixed by the plan (baseline order: 150; this plugin takes 60).
+// Bar glyph, legend marker and slot order are fixed by the plan (baseline order: 150; this plugin takes 60).
 const BAR_CELL = "\u2501"
+const LEGEND_MARK = "\u258D"
 const SLOT_ORDER = 60
 
 type ResolvedOptions = Required<PluginOptions_>
+type Theme = TuiPluginApi["theme"]["current"]
+// `Theme` also carries `thinkingOpacity: number`, so colour lookups are keyed by RGBA-valued tokens only.
+type ThemeColorKey = { [K in keyof Theme]: Theme[K] extends Theme["text"] ? K : never }[keyof Theme]
+type ThemeColor = Theme["text"]
+
+// Baseline segment colours (tui.js:394-416) and tier thresholds (tui.js:417-422).
+const SEGMENT_TOKEN = {
+  cached: "success",
+  prompt: "accent",
+  think: "warning",
+  out: "info",
+  reserved: "textMuted",
+  free: "text",
+} as const satisfies Record<SegmentId, ThemeColorKey>
+
+const LEGEND_LETTER = {
+  cached: "c",
+  prompt: "p",
+  think: "t",
+  out: "o",
+  reserved: "r",
+  free: "f",
+} as const satisfies Record<SegmentId, string>
+
+function segmentColor(id: SegmentId, theme: Theme): ThemeColor {
+  return theme[SEGMENT_TOKEN[id]]
+}
+
+function tierColor(percent: number, theme: Theme): ThemeColor {
+  if (percent >= 100) return theme.error
+  if (percent >= 75) return theme.warning
+  if (percent >= 50) return theme.accent
+  return theme.success
+}
 
 /** Resolves the context/output limits of the model that produced the last assistant turn. */
 function modelLimits(
@@ -25,14 +60,35 @@ function modelLimits(
   return { context: model.limit.context, output: model.limit.output }
 }
 
-/**
- * Draws the segmented bar from `formatBar`: every allocation renders as its `cells` count of `━`.
- * Task 12 replaces the single colour with per-segment colours and appends the legend here.
- */
-function barText(usage: Usage, config: ResolvedOptions): string {
-  return formatBar(usage.segments, usage.window, config.barWidth, config.exclude)
-    .map((entry) => BAR_CELL.repeat(entry.cells))
-    .join("")
+/** Renders the coloured bar, gated legend, tiered percent and totals for one usage snapshot. */
+function usageLines(api: TuiPluginApi, usage: Usage, config: ResolvedOptions) {
+  const theme = api.theme.current
+  const bar = formatBar(usage.segments, usage.window, config.barWidth, config.exclude)
+  const tokensById = new Map(usage.segments.map((segment) => [segment.id, segment.tokens]))
+  return (
+    <box flexDirection="column" gap={1}>
+      <box flexDirection="row">
+        {bar.map((entry) => (
+          <text fg={segmentColor(entry.id, theme)}>{BAR_CELL.repeat(entry.cells)}</text>
+        ))}
+      </box>
+      {config.showLegend ? (
+        <box flexDirection="row" gap={1}>
+          {bar.map((entry) => (
+            <box flexDirection="row">
+              <text fg={segmentColor(entry.id, theme)}>{`${LEGEND_MARK}${LEGEND_LETTER[entry.id]}`}</text>
+              <text fg={theme.textMuted}>{formatCompact(tokensById.get(entry.id) ?? 0)}</text>
+            </box>
+          ))}
+        </box>
+      ) : null}
+      <text fg={tierColor(usage.percent, theme)}>{` ${formatPercent(usage.percent)} used`}</text>
+      <text fg={theme.textMuted}>
+        {`${formatTokens(usage.used)} / ${usage.known ? formatTokens(usage.window) : "--"} tokens`}
+      </text>
+      {config.showCost ? <text fg={theme.textMuted}>{`${formatCost(usage.cost)} spent`}</text> : null}
+    </box>
+  )
 }
 
 function Panel(props: { api: TuiPluginApi; sessionId: string; config: ResolvedOptions }) {
@@ -58,14 +114,7 @@ function Panel(props: { api: TuiPluginApi; sessionId: string; config: ResolvedOp
       {current === undefined ? (
         <text fg={theme().textMuted}>no assistant turns yet</text>
       ) : (
-        <box flexDirection="column" gap={1}>
-          <text fg={theme().text}>{barText(current, props.config)}</text>
-          <text fg={theme().text}>{`${formatPercent(current.percent)} used`}</text>
-          <text fg={theme().textMuted}>
-            {`${formatTokens(current.used)} / ${current.known ? formatTokens(current.window) : "--"} tokens`}
-          </text>
-          {props.config.showCost ? <text fg={theme().textMuted}>{`${formatCost(current.cost)} spent`}</text> : null}
-        </box>
+        usageLines(props.api, current, props.config)
       )}
     </box>
   )

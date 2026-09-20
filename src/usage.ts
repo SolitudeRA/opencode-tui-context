@@ -4,7 +4,6 @@ export type AssistantUsage = {
   tokens: TokenCounts
   providerID?: string
   modelID?: string
-  cost?: number
 }
 
 /** Mirrors the baseline `record()` helper: only plain objects are usable as records. */
@@ -23,10 +22,6 @@ function count(value: unknown): number {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined
-}
-
-function optionalNumber(value: unknown): number | undefined {
-  return typeof value === "number" ? value : undefined
 }
 
 export function tokensOf(message: unknown): TokenCounts {
@@ -51,12 +46,10 @@ export function lastAssistantWithTokens(messages: readonly unknown[]): Assistant
     if (!carriesOutput) continue
     const providerID = optionalString(message.providerID)
     const modelID = optionalString(message.modelID)
-    const cost = optionalNumber(message.cost)
     return {
       tokens: tokensOf(message),
       ...(providerID === undefined ? {} : { providerID }),
       ...(modelID === undefined ? {} : { modelID }),
-      ...(cost === undefined ? {} : { cost }),
     }
   }
   return undefined
@@ -65,7 +58,6 @@ export function lastAssistantWithTokens(messages: readonly unknown[]): Assistant
 export function computeUsage(input: {
   tokens: TokenCounts
   limits?: UsageLimits
-  cost?: number
   exclude?: SegmentId[]
 }): Usage {
   const { input: inputTokens, output, reasoning, cacheRead, cacheWrite } = input.tokens
@@ -88,7 +80,6 @@ export function computeUsage(input: {
     used,
     window,
     percent: window > 0 ? Math.min(100, Math.round((used / window) * 100)) : 0,
-    cost: input.cost ?? 0,
     segments: candidates.filter((segment) => segment.tokens > 0 && !exclude.includes(segment.id)),
     known: window > 0,
   }

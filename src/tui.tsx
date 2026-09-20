@@ -1,4 +1,5 @@
 /** @jsxImportSource @opentui/solid */
+import { appendFileSync } from "node:fs"
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import { createSignal } from "solid-js"
 import { formatBar, formatCompact, formatCost, formatPercent, formatTokens } from "./format"
@@ -10,6 +11,11 @@ import { computeUsage, lastAssistantWithTokens } from "./usage"
 const BAR_CELL = "\u2501"
 const LEGEND_MARK = "\u258D"
 const SLOT_ORDER = 60
+// Minimum spacing between two repaints (plan task 13; baseline throttle is `tui.js:210-224`).
+const REPAINT_INTERVAL_MS = 50
+// verification probe (plan task 13 acceptance) — safe to remove after QA.
+// Absolute on purpose: opencode loads this plugin from its own process, whose cwd is not the project root.
+const EVENT_PROBE_PATH = "/mnt/e/Coding/opencode-context-monitor/verification/13-events.log"
 
 type ResolvedOptions = Required<PluginOptions_>
 type Theme = TuiPluginApi["theme"]["current"]
@@ -123,9 +129,48 @@ function Panel(props: { api: TuiPluginApi; sessionId: string; config: ResolvedOp
 const tui: TuiPlugin = async (api, options) => {
   const config = parseOptions(options)
   // The tick signal is the repaint trigger: reading it in the slot body subscribes this panel to
-  // the throttled refresh that task 13 wires to the session event bus. Until then the panel
-  // renders once when the slot mounts.
+  // the throttled refresh wired below to the session event bus.
   const [tick, setTick] = createSignal(0)
+
+  const repaint = () => {
+    // The signal bump re-runs the slot body (this bundle has no fine-grained reactivity — see
+    // notepad T11); requestRender() draws the resulting frame.
+    setTick((n) => n + 1)
+    api.renderer.requestRender()
+  }
+
+  // Leading-edge throttle: events landing inside the window are dropped, the first event after it
+  // repaints. No timer is scheduled, so dispose has no pending callback to cancel.
+  let lastRepaint = 0
+  const throttledRepaint = () => {
+    const now = Date.now()
+    if (now - lastRepaint < REPAINT_INTERVAL_MS) return
+    lastRepaint = now
+    repaint()
+  }
+
+  // verification probe (plan task 13 acceptance) — safe to remove after QA
+  let delivered = 0
+  const onSessionEvent = (type: string) => {
+    delivered += 1
+    try {
+      appendFileSync(EVENT_PROBE_PATH, `${new Date().toISOString()} event=${type} n=${delivered}\n`)
+    } catch {
+      // A missing probe directory on another machine must never break the panel.
+    }
+    throttledRepaint()
+  }
+
+  const unsubs: Array<() => void> = [
+    api.event.on("message.updated", (event) => onSessionEvent(event.type)),
+    api.event.on("message.part.updated", (event) => onSessionEvent(event.type)),
+    api.event.on("session.updated", (event) => onSessionEvent(event.type)),
+    api.event.on("session.idle", (event) => onSessionEvent(event.type)),
+  ]
+  api.lifecycle.onDispose(() => {
+    for (const unsubscribe of unsubs) unsubscribe()
+  })
+
   api.slots.register({
     order: SLOT_ORDER,
     slots: {

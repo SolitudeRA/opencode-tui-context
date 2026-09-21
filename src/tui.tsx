@@ -1,21 +1,15 @@
 /** @jsxImportSource @opentui/solid */
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import type { BoxRenderable } from "@opentui/core"
-import { createEffect, createSignal, type JSX } from "solid-js"
-import { formatBar, formatCompact, formatPercent, formatTokens } from "./format"
+import { createEffect, createSignal } from "solid-js"
+import { formatCompact, formatCompositionBar, formatOverviewBar, formatPercent } from "./format"
 import { parseOptions } from "./options"
-import type { PluginOptions_, SegmentId, Usage, UsageLimits } from "./types"
+import type { OverviewSegmentId, PluginOptions_, SegmentId, Usage, UsageLimits } from "./types"
 import { computeUsage, lastAssistantWithTokens, type AssistantUsage } from "./usage"
 
-// Bar glyphs, legend marker and slot orders are fixed by the plan (baseline order: 150; this plugin takes 60).
 const BAR_FILLED = "\u2593"
 const BAR_EMPTY = "\u2591"
-const LEGEND_MARK = "\u258D"
 const SLOT_ORDER = 60
-// One registration per block so the sidebar can order them against other plugins' blocks; the
-// plan's final order is context 60 → todo 100 → mcp 1000.
-const TODO_SLOT_ORDER = 100
-const MCP_SLOT_ORDER = 1000
 // Minimum spacing between two repaints (plan task 13; baseline throttle is `tui.js:210-224`).
 const REPAINT_INTERVAL_MS = 50
 
@@ -54,33 +48,25 @@ const LEGEND_LETTER = {
   free: "f",
 } as const satisfies Record<SegmentId, string>
 
-// Todo status colours; the SDK types `status` as a plain string, so unknown values fall back to textMuted.
-const TODO_TOKEN = {
-  completed: "success",
-  in_progress: "accent",
-  pending: "textMuted",
-  cancelled: "textMuted",
-} as const satisfies Record<string, ThemeColorKey>
+// `used` is not a `SegmentId`, so the overview bar cannot reuse `SEGMENT_TOKEN`/`LEGEND_LETTER`.
+const OVERVIEW_TOKEN = {
+  used: "primary",
+  reserved: "textMuted",
+  free: "text",
+} as const satisfies Record<OverviewSegmentId, ThemeColorKey>
 
-// MCP server status colours (host enum: connected | disabled | failed | needs_auth | needs_client_registration).
-const MCP_TOKEN = {
-  connected: "success",
-  failed: "error",
-  needs_auth: "warning",
-  needs_client_registration: "warning",
-  disabled: "textMuted",
-} as const satisfies Record<string, ThemeColorKey>
+const OVERVIEW_LETTER = {
+  used: "u",
+  reserved: "r",
+  free: "f",
+} as const satisfies Record<OverviewSegmentId, string>
+
+// Bar order == legend-row order (overview trail, then the baseline composition order `tui.js:42-49`).
+const OVERVIEW_IDS: readonly OverviewSegmentId[] = ["used", "reserved", "free"]
+const COMPOSITION_IDS: readonly SegmentId[] = ["cached", "prompt", "think", "out"]
 
 function segmentColor(id: SegmentId, theme: Theme): ThemeColor {
   return theme[SEGMENT_TOKEN[id]]
-}
-
-function todoColor(status: string, theme: Theme): ThemeColor {
-  return theme[TODO_TOKEN[status as keyof typeof TODO_TOKEN] ?? "textMuted"]
-}
-
-function mcpColor(status: string, theme: Theme): ThemeColor {
-  return theme[MCP_TOKEN[status as keyof typeof MCP_TOKEN] ?? "textMuted"]
 }
 
 function tierColor(percent: number, theme: Theme): ThemeColor {
@@ -103,34 +89,53 @@ function modelLimits(
   return { context: model.limit.context, output: model.limit.output }
 }
 
-/** Renders the coloured bar, gated legend, tiered percent and totals for one usage snapshot. */
+/** Renders the overview and composition bars plus their gated legend rows for one usage snapshot. */
 function usageLines(api: TuiPluginApi, usage: Usage, config: ResolvedOptions) {
   const theme = api.theme.current
-  const bar = formatBar(usage.segments, usage.window, effectiveWidth(), config.exclude)
+  const width = effectiveWidth()
   const tokensById = new Map(usage.segments.map((segment) => [segment.id, segment.tokens]))
+  // `Usage` has no `reserved`/`free` fields: the segment list is their only source, and a missing
+  // entry means zero (it drops zero-token segments; excluded ids are skipped from the legend).
+  const overviewTokens = (id: OverviewSegmentId): number =>
+    id === "used" ? usage.used : (tokensById.get(id) ?? 0)
+  const overviewBar = formatOverviewBar(usage.used, overviewTokens("reserved"), usage.window, width, config.exclude)
+  const compositionBar = formatCompositionBar(usage.segments, usage.used, width, config.exclude)
   return (
     <box flexDirection="column" gap={1}>
       <box flexDirection="row">
-        {bar.map((entry) => (
-          <text fg={segmentColor(entry.id, theme)}>
+        {overviewBar.map((entry) => (
+          <text fg={theme[OVERVIEW_TOKEN[entry.id]]}>
             {(entry.id === "free" ? BAR_EMPTY : BAR_FILLED).repeat(entry.cells)}
           </text>
         ))}
       </box>
+      <box flexDirection="row">
+        {compositionBar.map((entry) => (
+          <text fg={segmentColor(entry.id, theme)}>{BAR_FILLED.repeat(entry.cells)}</text>
+        ))}
+      </box>
       {config.showLegend ? (
         <box flexDirection="row" gap={1}>
-          {bar.map((entry) => (
+          {OVERVIEW_IDS.filter((id) => id === "used" || !config.exclude.includes(id)).map((id) => (
             <box flexDirection="row">
-              <text fg={segmentColor(entry.id, theme)}>{`${LEGEND_MARK}${LEGEND_LETTER[entry.id]}`}</text>
-              <text fg={theme.textMuted}>{formatCompact(tokensById.get(entry.id) ?? 0)}</text>
+              <text fg={theme[OVERVIEW_TOKEN[id]]}>
+                {`${id === "free" ? BAR_EMPTY : BAR_FILLED}${OVERVIEW_LETTER[id]}`}
+              </text>
+              <text fg={theme.textMuted}>{formatCompact(overviewTokens(id))}</text>
             </box>
           ))}
         </box>
       ) : null}
-      <text fg={tierColor(usage.percent, theme)}>{` ${formatPercent(usage.percent)} used`}</text>
-      <text fg={theme.textMuted}>
-        {`${formatTokens(usage.used)} / ${usage.known ? formatTokens(usage.window) : "--"} tokens`}
-      </text>
+      {config.showLegend ? (
+        <box flexDirection="row" gap={1}>
+          {COMPOSITION_IDS.filter((id) => !config.exclude.includes(id)).map((id) => (
+            <box flexDirection="row">
+              <text fg={segmentColor(id, theme)}>{`${BAR_FILLED}${LEGEND_LETTER[id]}`}</text>
+              <text fg={theme.textMuted}>{formatCompact(tokensById.get(id) ?? 0)}</text>
+            </box>
+          ))}
+        </box>
+      ) : null}
     </box>
   )
 }
@@ -173,75 +178,20 @@ function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptio
         if (typeof w === "number" && Number.isFinite(w) && w > 0) setPanelWidth(w)
       }}
     >
-      <text fg={theme.text}>
-        <b>Context</b>
-      </text>
+      <box flexDirection="row" justifyContent="space-between">
+        <text fg={theme.text}>
+          <b>Context</b>
+        </text>
+        {usage === undefined ? null : (
+          <text fg={tierColor(usage.percent, theme)}>{`${formatPercent(usage.percent)} used`}</text>
+        )}
+      </box>
       {usage === undefined ? (
         <text fg={theme.textMuted}>no assistant turns yet</text>
       ) : (
         usageLines(api, usage, config)
       )}
     </box>
-  )
-}
-
-/** Sidebar frame shared by the todo and mcp blocks; same border/padding as `renderPanel`. */
-function sidebarFrame(title: string, theme: Theme, body: JSX.Element) {
-  return (
-    <box
-      flexDirection="column"
-      gap={1}
-      border
-      borderColor={theme.borderSubtle}
-      paddingLeft={1}
-      paddingRight={1}
-    >
-      <text fg={theme.text}>
-        <b>{title}</b>
-      </text>
-      {body}
-    </box>
-  )
-}
-
-/** Flattens one sidebar line and caps it at the measured width so long content cannot wrap. */
-function clampLine(text: string, width: number): string {
-  const line = text.replace(/\s+/g, " ").trim()
-  if (line.length <= width) return line
-  return `${line.slice(0, Math.max(1, width - 1))}\u2026`
-}
-
-/** Builds the `Todo` block for one session: one coloured line per item, no frame when the list is empty. */
-function renderTodo(api: TuiPluginApi, sessionId: string, config: ResolvedOptions) {
-  const todos = api.state.session.todo(sessionId)
-  if (todos.length === 0) return undefined
-  const theme = api.theme.current
-  const width = effectiveWidth()
-  return sidebarFrame(
-    "Todo",
-    theme,
-    <box flexDirection="column">
-      {todos.map((todo) => (
-        <text fg={todoColor(todo.status, theme)}>{clampLine(todo.content, width)}</text>
-      ))}
-    </box>,
-  )
-}
-
-/** Builds the `MCP` block: one `name status` line per server, no frame when there are no servers. */
-function renderMcp(api: TuiPluginApi, config: ResolvedOptions) {
-  const servers = api.state.mcp()
-  if (servers.length === 0) return undefined
-  const theme = api.theme.current
-  const width = effectiveWidth()
-  return sidebarFrame(
-    "MCP",
-    theme,
-    <box flexDirection="column">
-      {servers.map((server) => (
-        <text fg={mcpColor(server.status, theme)}>{clampLine(`${server.name} ${server.status}`, width)}</text>
-      ))}
-    </box>,
   )
 }
 
@@ -298,26 +248,6 @@ const tui: TuiPlugin = async (api, options) => {
       sidebar_content(_ctx, props) {
         tick()
         return renderPanel(api, props.session_id, config)
-      },
-    },
-  })
-
-  api.slots.register({
-    order: TODO_SLOT_ORDER,
-    slots: {
-      sidebar_content(_ctx, props) {
-        tick()
-        return renderTodo(api, props.session_id, config)
-      },
-    },
-  })
-
-  api.slots.register({
-    order: MCP_SLOT_ORDER,
-    slots: {
-      sidebar_content(_ctx, _props) {
-        tick()
-        return renderMcp(api, config)
       },
     },
   })

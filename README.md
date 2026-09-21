@@ -1,12 +1,12 @@
 # opencode-tui-context
 
-在 OpenCode 的 TUI 侧边栏里，把当前会话的上下文窗口占用画成一条分段彩条。插件注册宿主提供的 `sidebar_content` 槽位，读取当前会话最后一条 assistant 消息的 token 统计与模型限额，算出各段占比并渲染。插件 id 为 `opencode-tui-context`。
+在 OpenCode 的 TUI 侧边栏里，把当前会话的上下文窗口占用画成两条分段进度条：一条总览条显示 `used` / `reserved` / `free`，一条构成条显示 `cached` / `prompt` / `think` / `out`。插件注册宿主提供的 `sidebar_content` 槽位，读取当前会话最后一条 assistant 消息的 token 统计与模型限额，算出各段占比并渲染。插件 id 为 `opencode-tui-context`。
 
 ## 功能
 
-- 在侧边栏渲染一条宽度可配的分段条，每一段对应一类 token 占用。
-- 条下方给出字母图例：每个出现的段一个字母，外加该段的紧凑计数。
-- 给出百分比占用，以及 `已用 / 窗口` 的 token 总数。
+- 在侧边栏渲染两条宽度可配的进度条，上下各占一行：总览条以 `window` 为分母，分成 `used` / `reserved` / `free` 三段；构成条以 `used` 为分母，分成 `cached` / `prompt` / `think` / `out` 四段。
+- 每条进度条下方各配一排字母图例：总览条是 `u` / `r` / `f`，构成条是 `c` / `p` / `t` / `o`。每个条目是一个与条同款的一格色块，后面紧跟字母和该段的紧凑计数。
+- 在面板右上角给出百分比占用；token 总量不再单列一行，改由总览条那排图例（`u` / `r` / `f` 三项数字）承担。
 - 会话有新消息时自动刷新：订阅 `message.updated`、`message.part.updated`、`session.updated`、`session.idle` 四个事件，重绘做 50ms 前置节流；卸载时清理全部订阅，不用定时轮询。
 - 还没有 assistant 消息时显示 `no assistant turns yet`，不是空白，也不报错。
 
@@ -14,22 +14,27 @@
 
 ## 显示内容
 
-分段含义与颜色对照如下。
+两条进度条的分段含义与颜色对照如下。
 
-| segment id | 含义 | 颜色 token |
-| --- | --- | --- |
-| `cached` | 缓存命中的输入 token（cache read） | `success` |
-| `prompt` | input + cacheWrite | `accent` |
-| `think` | reasoning | `warning` |
-| `out` | output | `info` |
-| `reserved` | `limit.output - output` 的预留量 | `textMuted` |
-| `free` | 窗口剩余 | `text` |
+| 所属条 | segment id | 含义 | 颜色 token |
+| --- | --- | --- | --- |
+| 总览条 | `used` | input + cacheRead + cacheWrite + reasoning + output | `primary` |
+| 总览条 | `reserved` | `limit.output - output` 的预留量 | `textMuted` |
+| 总览条 | `free` | 窗口剩余 | `text` |
+| 构成条 | `cached` | 缓存命中的输入 token（cache read） | `success` |
+| 构成条 | `prompt` | input + cacheWrite | `accent` |
+| 构成条 | `think` | reasoning | `warning` |
+| 构成条 | `out` | output | `info` |
 
 颜色 token 就是宿主主题里的字段名，取值来自 `api.theme.current.<token>`。
 
-面板最外层有一条 `borderSubtle` 色的边框，左右各留一列内边距，`Context` 标题在框内顶行。条用点阵字符绘制：占用段是实心 `▓`（U+2593），`free` 段是空心 `░`（U+2591），每一段按分到的格数重复对应字符并染上该段颜色。图例的标记是 `▍`（U+258D），后面紧跟一个小写字母：`c`、`p`、`t`、`o`、`r`、`f`，分别对应上表的六个 segment id。字母用所属段的颜色着色，紧跟的紧凑计数（如 `17.4K`）统一用 `textMuted`。
+面板最外层有一条 `borderSubtle` 色的边框，左右各留一列内边距。框内自上而下依次是标题行、总览条、构成条、第一排图例、第二排图例。标题行两端由 `space-between` 分列：左侧是 `Context` 标题，右端是占用百分比（形如 `42% used`）。
 
-被 `exclude` 排除的段不会出现，字母与计数一并消失。百分比行的颜色随占用分档：`>= 100` 用 `error`，`>= 75` 用 `warning`，`>= 50` 用 `accent`，其余用 `success`。条的总列数由面板实测宽度决定，会跟随实际可用宽度自适应：面板变宽时条随之变长，侧边栏收窄时条随之缩短，不会换行，右侧的百分比照常显示。
+两条进度条都铺满整行，用点阵字符绘制：每一段按分到的格数重复对应字符并染上该段颜色。总览条以 `window` 为分母，`used` 与 `reserved` 是实心 `▓`（U+2593），`free` 是空心 `░`（U+2591）；未占满的余量全部补成末尾的 `free`，所以三段格数之和恰好等于条宽（除非 `free` 被排除）。构成条以 `used` 为分母，`cached`、`prompt`、`think`、`out` 四段一律实心 `▓`，并且刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格，条右端允许留下这点空隙。
+
+两排图例只在 `showLegend` 为 `true` 时出现。第一排对应总览条，依次是 `u` / `r` / `f`；第二排对应构成条，依次是 `c` / `p` / `t` / `o`。每个条目由三部分组成：一个与条同款的一格色块，非 `free` 段是实心 `▓`（U+2593），`free` 段是空心 `░`（U+2591）；后面紧跟一个小写字母；再跟该段的紧凑计数（如 `17.4K`）。字母取所属段的颜色，计数统一用 `textMuted`。
+
+被 `exclude` 排除的段会同时从它所属的条和对应图例条目里消失，字母与计数一并消失。右上角百分比的颜色随占用分档：`>= 100` 用 `error`，`>= 75` 用 `warning`，`>= 50` 用 `accent`，其余用 `success`。两条进度条的总列数都由面板实测宽度决定，会跟随实际可用宽度自适应：面板变宽时两条条一起变长，侧边栏收窄时两条条一起缩短，不会换行；右上角的百分比固定显示，不受条宽影响。
 
 ## 安装
 
@@ -84,8 +89,8 @@ cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 | 选项 | 默认值 | 规则与回退 |
 | --- | --- | --- |
 | `barWidth` | `24` | 面板实测宽度出来之前的初始条宽（字符数）。先四舍五入，再夹到 `8-120`。非数字或非有限值（`NaN`、`±Infinity`）回退到 `24`；`0` 会被夹到 `8`，`999` 夹到 `120`。首帧之后条宽由面板实测宽度决定并自动跟随，`barWidth` 只在尚未测量时兜底。 |
-| `exclude` | `[]` | 要从条与图例里隐藏的 segment id 列表。只接受 `cached`、`prompt`、`think`、`out`、`reserved`、`free` 六个值，非法值被丢掉，重复值去重并保留首次出现的顺序。非数组回退到 `[]`。 |
-| `showLegend` | `true` | 是否显示 `▍` 字母图例行。非布尔值回退到 `true`。设为 `false` 时只隐藏图例，条与百分比保留。 |
+| `exclude` | `[]` | 要从两条进度条和对应图例里隐藏的 segment id 列表。只接受 `cached`、`prompt`、`think`、`out`、`reserved`、`free` 六个值，非法值被丢掉，重复值去重并保留首次出现的顺序。非数组回退到 `[]`。 |
+| `showLegend` | `true` | 是否显示两排字母图例。非布尔值回退到 `true`。设为 `false` 时只隐藏两排图例，两条进度条与右上角百分比保留。 |
 
 所有选项都经过规范化。配置缺省、为 `null`、类型不对，甚至整个选项对象根本不是对象，都不会抛错，一律回退到上表默认值。
 
@@ -105,9 +110,11 @@ percent  = min(100, round(used / window * 100))
 几点说明：
 
 - 被测量的对象是会话里最新的一条携带 `tokens.output > 0` 的 assistant 消息。从消息列表尾部往前找，第一条同时满足 `role === "assistant"` 与 `tokens.output > 0` 的消息就是数据源。
-- 当 `window` 为 `0`（模型限额拿不到）时，`free` 与 `percent` 都取 `0`，token 总数一行显示 `--` 作为窗口。
+- 当 `window` 为 `0`（模型限额拿不到）时，`free` 与 `percent` 都取 `0`，总览条因为没有分母而整体留空，构成条与两排图例照常渲染。
 - `reserved` 只在 `limit.output > 0` 时计算，否则为 `0`。
-- 条里每一段的格数按 `round(段 token / window * barWidth)` 分配，总和不超过 `barWidth`，剩下的余量补成末尾的 `free` 段（除非 `free` 在 `exclude` 里）。
+- 总览条的 `used` 与 `reserved` 按 `round(段 token / window * barWidth)` 分配，未占满的余量全部补成末尾的 `free` 段（除非 `free` 在 `exclude` 里），三段之和恰好等于条宽。
+- 构成条的 `cached`、`prompt`、`think`、`out` 按 `round(段 token / used * barWidth)` 分配，刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格。
+- 视觉保底对两条条都生效：一个 `token > 0` 的段若四舍五入后不足 `1` 格，会被补足为 `1` 格，避免整段从条与图例里消失。补格时先扣未分配的余量，余量不足则从当前最宽的段借一格；若两者都腾不出格子，该段仍不显示。
 - 只有 token 数 `> 0` 的段才会进入条与图例。
 
 ## 兼容性

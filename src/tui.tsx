@@ -117,9 +117,9 @@ function usageLines(api: TuiPluginApi, usage: Usage, config: ResolvedOptions) {
       {config.showLegend ? (
         <box flexDirection="row" gap={1}>
           {OVERVIEW_IDS.filter((id) => id === "used" || !config.exclude.includes(id)).map((id) => (
-            <box flexDirection="row">
+            <box flexDirection="row" gap={1}>
               <text fg={theme[OVERVIEW_TOKEN[id]]}>
-                {`${id === "free" ? BAR_EMPTY : BAR_FILLED}${OVERVIEW_LETTER[id]}`}
+                {`${id === "free" ? BAR_EMPTY : BAR_FILLED} ${OVERVIEW_LETTER[id]}`}
               </text>
               <text fg={theme.textMuted}>{formatCompact(overviewTokens(id))}</text>
             </box>
@@ -129,8 +129,8 @@ function usageLines(api: TuiPluginApi, usage: Usage, config: ResolvedOptions) {
       {config.showLegend ? (
         <box flexDirection="row" gap={1}>
           {COMPOSITION_IDS.filter((id) => !config.exclude.includes(id)).map((id) => (
-            <box flexDirection="row">
-              <text fg={segmentColor(id, theme)}>{`${BAR_FILLED}${LEGEND_LETTER[id]}`}</text>
+            <box flexDirection="row" gap={1}>
+              <text fg={segmentColor(id, theme)}>{`${BAR_FILLED} ${LEGEND_LETTER[id]}`}</text>
               <text fg={theme.textMuted}>{formatCompact(tokensById.get(id) ?? 0)}</text>
             </box>
           ))}

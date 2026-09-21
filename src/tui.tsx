@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
-import type { BoxRenderable } from "@opentui/core"
+import { RGBA, type BoxRenderable } from "@opentui/core"
 import { createEffect, createSignal } from "solid-js"
 import { formatCompact, formatCompositionBar, formatOverviewBar, formatPercent } from "./format"
 import { parseOptions } from "./options"
@@ -29,15 +29,21 @@ type Theme = TuiPluginApi["theme"]["current"]
 type ThemeColorKey = { [K in keyof Theme]: Theme[K] extends Theme["text"] ? K : never }[keyof Theme]
 type ThemeColor = Theme["text"]
 
-// Baseline segment colours (tui.js:394-416) and tier thresholds (tui.js:417-422).
+// The theme has no bright yellow: its only yellows (`warning` ~34 deg, `markdownEmph` ~39 deg) sit
+// only 10-15 deg of hue from the overview bar's `used` (`primary` ~24 deg) — the exact collision
+// this panel must avoid. `out` therefore uses a hardcoded bright yellow instead of a theme token.
+const OUT_COLOR = RGBA.fromHex("#ffff00")
+
+// Final segment colours: `think` uses `secondary` (blue, hue ~215 deg), >=46 deg of hue from every
+// other panel colour; `out` uses the hardcoded `OUT_COLOR` (`#ffff00`, pure yellow, hue 60 deg),
+// whose tightest pairing is 36 deg against the overview bar's `used` (`primary`, ~24 deg).
 const SEGMENT_TOKEN = {
   cached: "success",
   prompt: "accent",
-  think: "warning",
-  out: "info",
+  think: "secondary",
   reserved: "textMuted",
   free: "text",
-} as const satisfies Record<SegmentId, ThemeColorKey>
+} as const satisfies Record<Exclude<SegmentId, "out">, ThemeColorKey>
 
 const LEGEND_LETTER = {
   cached: "c",
@@ -66,14 +72,7 @@ const OVERVIEW_IDS: readonly OverviewSegmentId[] = ["used", "reserved", "free"]
 const COMPOSITION_IDS: readonly SegmentId[] = ["cached", "prompt", "think", "out"]
 
 function segmentColor(id: SegmentId, theme: Theme): ThemeColor {
-  return theme[SEGMENT_TOKEN[id]]
-}
-
-function tierColor(percent: number, theme: Theme): ThemeColor {
-  if (percent >= 100) return theme.error
-  if (percent >= 75) return theme.warning
-  if (percent >= 50) return theme.accent
-  return theme.success
+  return id === "out" ? OUT_COLOR : theme[SEGMENT_TOKEN[id]]
 }
 
 /** Resolves the context/output limits of the model that produced the last assistant turn. */
@@ -183,7 +182,7 @@ function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptio
           <b>Context</b>
         </text>
         {usage === undefined ? null : (
-          <text fg={tierColor(usage.percent, theme)}>{`${formatPercent(usage.percent)} used`}</text>
+          <text fg={theme[OVERVIEW_TOKEN.used]}>{`${formatPercent(usage.percent)} used`}</text>
         )}
       </box>
       {usage === undefined ? (

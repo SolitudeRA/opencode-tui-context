@@ -5,7 +5,7 @@
 ## 功能
 
 - 在侧边栏渲染两条宽度可配的进度条，上下各占一行：总览条以 `window` 为分母，分成 `used` / `reserved` / `free` 三段；构成条以 `used` 为分母，分成 `cached` / `prompt` / `think` / `out` 四段。
-- 每条进度条下方各配一排字母图例：总览条是 `u` / `r` / `f`，构成条是 `c` / `p` / `t` / `o`。每个条目是一个与条同款的一格色块，后面紧跟字母和该段的紧凑计数。
+- 每条进度条下方各配一排字母图例：总览条是 `u` / `r` / `f`，构成条是 `c` / `p` / `t` / `o`。每个条目是一个与条同款的一格色块，色块与字母、字母与该段的紧凑计数之间各空一格。
 - 在面板右上角给出百分比占用；token 总量不再单列一行，改由总览条那排图例（`u` / `r` / `f` 三项数字）承担。
 - 会话有新消息时自动刷新：订阅 `message.updated`、`message.part.updated`、`session.updated`、`session.idle` 四个事件，重绘做 50ms 前置节流；卸载时清理全部订阅，不用定时轮询。
 - 还没有 assistant 消息时显示 `no assistant turns yet`，不是空白，也不报错。
@@ -32,7 +32,7 @@
 
 两条进度条都铺满整行，用点阵字符绘制：每一段按分到的格数重复对应字符并染上该段颜色。总览条以 `window` 为分母，`used` 与 `reserved` 是实心 `▓`（U+2593），`free` 是空心 `░`（U+2591）；未占满的余量全部补成末尾的 `free`，所以三段格数之和恰好等于条宽（除非 `free` 被排除）。构成条以 `used` 为分母，`cached`、`prompt`、`think`、`out` 四段一律实心 `▓`，并且刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格，条右端允许留下这点空隙。
 
-两排图例只在 `showLegend` 为 `true` 时出现。第一排对应总览条，依次是 `u` / `r` / `f`；第二排对应构成条，依次是 `c` / `p` / `t` / `o`。每个条目由三部分组成：一个与条同款的一格色块，非 `free` 段是实心 `▓`（U+2593），`free` 段是空心 `░`（U+2591）；后面紧跟一个小写字母；再跟该段的紧凑计数（如 `17.4K`）。字母取所属段的颜色，计数统一用 `textMuted`。
+两排图例只在 `showLegend` 为 `true` 时出现。第一排对应总览条，依次是 `u` / `r` / `f`；第二排对应构成条，依次是 `c` / `p` / `t` / `o`。每个条目由三部分组成，相邻两部分之间空一格：一个与条同款的一格色块，非 `free` 段是实心 `▓`（U+2593），`free` 段是空心 `░`（U+2591）；接着是一个小写字母；最后是该段的紧凑计数（如 `17.4K`）。字母取所属段的颜色，计数统一用 `textMuted`。
 
 被 `exclude` 排除的段会同时从它所属的条和对应图例条目里消失，字母与计数一并消失。右上角百分比的颜色随占用分档：`>= 100` 用 `error`，`>= 75` 用 `warning`，`>= 50` 用 `accent`，其余用 `success`。两条进度条的总列数都由面板实测宽度决定，会跟随实际可用宽度自适应：面板变宽时两条条一起变长，侧边栏收窄时两条条一起缩短，不会换行；右上角的百分比固定显示，不受条宽影响。
 
@@ -54,7 +54,7 @@ opencode plugin opencode-tui-context
 }
 ```
 
-方式二，本地路径（本项目验证期间采用的方式）。把构建产物 `dist/` 与 `package.json` 复制到一个本地目录，再把该目录的绝对路径追加进 `tui.json` 的 `plugin` 数组：
+方式二，本地路径（本项目当前采用的方式）。把构建产物 `dist/` 与 `package.json` 复制到一个本地目录，再把该目录的绝对路径写进 `tui.json` 的 `plugin` 数组：
 
 ```
 mkdir -p ~/.config/opencode/local-plugins/opencode-tui-context
@@ -128,9 +128,9 @@ percent  = min(100, round(used / window * 100))
 
 `sidebar_content` 是宿主提供的一个共享槽位，多个插件可以往同一个槽位注册内容。本插件以 `order: 60` 注册该槽位。`order` 的值定义在插件实现里，不写在 `tui.json` 中。
 
-`opencode-plugin-context` 同样注册 `sidebar_content`。两者同时启用，侧边栏会出现两个内容重叠的上下文面板，建议只留一个。要停用它，把 `"opencode-plugin-context@latest"` 从 `tui.json` 的 `plugin` 数组里移除即可。
+`opencode-plugin-context` 同样注册 `sidebar_content`。两者同时启用，侧边栏会出现两个内容重叠的上下文面板，所以本项目只保留本插件，`"opencode-plugin-context@latest"` 已经从 `tui.json` 的 `plugin` 数组里移除。
 
-作为参考，本项目验证期间用户 `tui.json` 的 `plugin` 数组实际包含六项：
+作为参考，本项目当前用户 `tui.json` 的 `plugin` 数组包含六项：
 
 ```json
 "plugin": [
@@ -138,18 +138,24 @@ percent  = min(100, round(used / window * 100))
   ["opencode-zh-plugin", { "tuiSlots": false, "commands": false }],
   "opencode-visual-cache@latest",
   "/home/lee/.config/opencode/local-plugins/opencode-tui-deepseek-cny",
-  "opencode-plugin-context@latest",
-  "@tarquinen/opencode-dcp@latest"
+  "@tarquinen/opencode-dcp@latest",
+  "/home/lee/.config/opencode/local-plugins/opencode-tui-context"
 ]
 ```
 
-其 `plugin_enabled` 映射里，`internal:sidebar-context` 已经是 `false`，`internal:sidebar-lsp` 也是 `false`。如果以前用过内置的上下文面板，注意保持这一项关闭，别让它和 `opencode-plugin-context` 或本插件叠在一起。
+其 `plugin_enabled` 里只有一个键，即 `"internal:sidebar-context": false`，它关掉宿主内置的上下文面板，免得它在同一个槽位里再画一个重叠的面板；本插件在 `plugin_enabled` 里没有条目，所以保持启用。如果以前用过内置的上下文面板，注意保持这一项为 `false`。
 
-## 回滚
+## 停用与卸载
 
-本项目承诺不永久修改你的 `~/.config/opencode/tui.json`。验证期间对 `tui.json` 只做临时追加，不改动也不删除任何原有条目，结束立刻还原。
+只想暂时停用、保留文件以便日后重新启用：打开 `~/.config/opencode/tui.json`，从 `plugin` 数组里移除 `/home/lee/.config/opencode/local-plugins/opencode-tui-context` 这一项即可。如果还想把宿主内置的上下文面板请回来，再在 `plugin_enabled` 里把 `"internal:sidebar-context"` 设为 `true`。
 
-还原前先做一次备份，记下哈希：
+彻底卸载：先按上面的步骤停用，再删掉本地目录：
+
+```
+rm -rf ~/.config/opencode/local-plugins/opencode-tui-context
+```
+
+改 `tui.json` 时最好先做一次备份，记下哈希：
 
 ```
 B=/tmp/tui.json.before-$(date +%s%N)
@@ -157,11 +163,13 @@ cp ~/.config/opencode/tui.json "$B"
 sha256sum "$B"
 ```
 
-还原时把备份复制回去，再校验哈希与备份一致：
+需要还原时把备份复制回去，再校验哈希与备份一致：
 
 ```
 cp /tmp/tui.json.before-<timestamp> ~/.config/opencode/tui.json
 sha256sum ~/.config/opencode/tui.json
 ```
 
-如果只用过 npm 安装方式、从没手动编辑过 `tui.json`，回滚就是两步：从 `plugin` 数组里移除 `"opencode-tui-context@latest"`；如果还想清掉本地文件，删除 `~/.config/opencode/local-plugins/opencode-tui-context/` 目录。
+如果是从 npm 安装的，停用就是从 `plugin` 数组里移除 `"opencode-tui-context@latest"`；本地文件只需删掉 `~/.config/opencode/local-plugins/opencode-tui-context/` 目录。
+
+`tui.json` 只在 opencode 启动时读取一次，不做热重载，改完要重启 `opencode` 才生效。

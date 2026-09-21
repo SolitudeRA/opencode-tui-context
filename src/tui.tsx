@@ -1,17 +1,21 @@
 /** @jsxImportSource @opentui/solid */
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import type { BoxRenderable } from "@opentui/core"
-import { createEffect, createSignal } from "solid-js"
+import { createEffect, createSignal, type JSX } from "solid-js"
 import { formatBar, formatCompact, formatPercent, formatTokens } from "./format"
 import { parseOptions } from "./options"
 import type { PluginOptions_, SegmentId, Usage, UsageLimits } from "./types"
 import { computeUsage, lastAssistantWithTokens, type AssistantUsage } from "./usage"
 
-// Bar glyphs, legend marker and slot order are fixed by the plan (baseline order: 150; this plugin takes 60).
+// Bar glyphs, legend marker and slot orders are fixed by the plan (baseline order: 150; this plugin takes 60).
 const BAR_FILLED = "\u2593"
 const BAR_EMPTY = "\u2591"
 const LEGEND_MARK = "\u258D"
 const SLOT_ORDER = 60
+// One registration per block so the sidebar can order them against other plugins' blocks; the
+// plan's final order is context 60 → todo 100 → mcp 1000.
+const TODO_SLOT_ORDER = 100
+const MCP_SLOT_ORDER = 1000
 // Minimum spacing between two repaints (plan task 13; baseline throttle is `tui.js:210-224`).
 const REPAINT_INTERVAL_MS = 50
 
@@ -50,8 +54,33 @@ const LEGEND_LETTER = {
   free: "f",
 } as const satisfies Record<SegmentId, string>
 
+// Todo status colours; the SDK types `status` as a plain string, so unknown values fall back to textMuted.
+const TODO_TOKEN = {
+  completed: "success",
+  in_progress: "accent",
+  pending: "textMuted",
+  cancelled: "textMuted",
+} as const satisfies Record<string, ThemeColorKey>
+
+// MCP server status colours (host enum: connected | disabled | failed | needs_auth | needs_client_registration).
+const MCP_TOKEN = {
+  connected: "success",
+  failed: "error",
+  needs_auth: "warning",
+  needs_client_registration: "warning",
+  disabled: "textMuted",
+} as const satisfies Record<string, ThemeColorKey>
+
 function segmentColor(id: SegmentId, theme: Theme): ThemeColor {
   return theme[SEGMENT_TOKEN[id]]
+}
+
+function todoColor(status: string, theme: Theme): ThemeColor {
+  return theme[TODO_TOKEN[status as keyof typeof TODO_TOKEN] ?? "textMuted"]
+}
+
+function mcpColor(status: string, theme: Theme): ThemeColor {
+  return theme[MCP_TOKEN[status as keyof typeof MCP_TOKEN] ?? "textMuted"]
 }
 
 function tierColor(percent: number, theme: Theme): ThemeColor {
@@ -156,6 +185,66 @@ function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptio
   )
 }
 
+/** Sidebar frame shared by the todo and mcp blocks; same border/padding as `renderPanel`. */
+function sidebarFrame(title: string, theme: Theme, body: JSX.Element) {
+  return (
+    <box
+      flexDirection="column"
+      gap={1}
+      border
+      borderColor={theme.borderSubtle}
+      paddingLeft={1}
+      paddingRight={1}
+    >
+      <text fg={theme.text}>
+        <b>{title}</b>
+      </text>
+      {body}
+    </box>
+  )
+}
+
+/** Flattens one sidebar line and caps it at the measured width so long content cannot wrap. */
+function clampLine(text: string, width: number): string {
+  const line = text.replace(/\s+/g, " ").trim()
+  if (line.length <= width) return line
+  return `${line.slice(0, Math.max(1, width - 1))}\u2026`
+}
+
+/** Builds the `Todo` block for one session: one coloured line per item, no frame when the list is empty. */
+function renderTodo(api: TuiPluginApi, sessionId: string, config: ResolvedOptions) {
+  const todos = api.state.session.todo(sessionId)
+  if (todos.length === 0) return undefined
+  const theme = api.theme.current
+  const width = effectiveWidth()
+  return sidebarFrame(
+    "Todo",
+    theme,
+    <box flexDirection="column">
+      {todos.map((todo) => (
+        <text fg={todoColor(todo.status, theme)}>{clampLine(todo.content, width)}</text>
+      ))}
+    </box>,
+  )
+}
+
+/** Builds the `MCP` block: one `name status` line per server, no frame when there are no servers. */
+function renderMcp(api: TuiPluginApi, config: ResolvedOptions) {
+  const servers = api.state.mcp()
+  if (servers.length === 0) return undefined
+  const theme = api.theme.current
+  const width = effectiveWidth()
+  return sidebarFrame(
+    "MCP",
+    theme,
+    <box flexDirection="column">
+      {servers.map((server) => (
+        <text fg={mcpColor(server.status, theme)}>{clampLine(`${server.name} ${server.status}`, width)}</text>
+      ))}
+    </box>,
+  )
+}
+
 const tui: TuiPlugin = async (api, options) => {
   const config = parseOptions(options)
   // `barWidth` is only the pre-measurement starting width; the box measurement replaces it.
@@ -209,6 +298,26 @@ const tui: TuiPlugin = async (api, options) => {
       sidebar_content(_ctx, props) {
         tick()
         return renderPanel(api, props.session_id, config)
+      },
+    },
+  })
+
+  api.slots.register({
+    order: TODO_SLOT_ORDER,
+    slots: {
+      sidebar_content(_ctx, props) {
+        tick()
+        return renderTodo(api, props.session_id, config)
+      },
+    },
+  })
+
+  api.slots.register({
+    order: MCP_SLOT_ORDER,
+    slots: {
+      sidebar_content(_ctx, _props) {
+        tick()
+        return renderMcp(api, config)
       },
     },
   })

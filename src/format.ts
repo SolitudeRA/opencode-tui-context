@@ -19,6 +19,8 @@ export function formatPercent(n: number): string {
 // Cell accounting shared by the bar allocators: natural = round(tokens / denominator * width) before clamping.
 type CellPlan<T extends string> = { id: T; tokens: number; natural: number; cells: number }
 
+const COMPOSITION_IDS: readonly SegmentId[] = ["cached", "prompt", "think", "out"]
+
 /**
  * Distributes `width` cells across `entries` in order, mirroring the baseline `segmentBar`
  * (tui.js:132-144): each entry takes `round(tokens / denominator * width)` cells, capped by what is
@@ -88,4 +90,46 @@ export function formatBar(
   const { cells, remaining } = allocateCells(filtered, window, width)
   if (remaining > 0 && !exclude.includes("free")) cells.push({ id: "free", cells: remaining })
   return cells
+}
+
+/**
+ * Allocates the overview bar: `used` and `reserved` against `window`, with `free` taking the
+ * remaining cells (never `round(free / window * width)`) so the three parts sum to exactly `width`.
+ */
+export function formatOverviewBar(
+  used: number,
+  reserved: number,
+  window: number,
+  width: number,
+  exclude: readonly SegmentId[],
+): Array<{ id: OverviewSegmentId; cells: number }> {
+  if (width <= 0 || window <= 0) return []
+  const entries: Array<{ id: OverviewSegmentId; tokens: number }> = [
+    { id: "used", tokens: used },
+    { id: "reserved", tokens: reserved },
+  ]
+  const { cells, remaining } = allocateCells(entries, window, width)
+  if (remaining > 0 && !exclude.includes("free")) cells.push({ id: "free", cells: remaining })
+  return cells
+}
+
+/**
+ * Allocates the composition bar: only `cached`, `prompt`, `think` and `out` segments with positive
+ * tokens, against `used`. No `free` tail is appended, so rounding slack may leave 0-2 trailing cells.
+ */
+export function formatCompositionBar(
+  segments: readonly Segment[],
+  used: number,
+  width: number,
+  exclude: readonly SegmentId[],
+): Array<{ id: SegmentId; cells: number }> {
+  if (width <= 0 || used <= 0) return []
+  const filtered: Array<{ id: SegmentId; tokens: number }> = []
+  for (const segment of segments) {
+    if (!COMPOSITION_IDS.includes(segment.id)) continue
+    if (!(segment.tokens > 0)) continue
+    if (exclude.includes(segment.id)) continue
+    filtered.push({ id: segment.id, tokens: segment.tokens })
+  }
+  return allocateCells(filtered, used, width).cells
 }

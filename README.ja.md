@@ -1,165 +1,270 @@
-[English](README.md) | [简体中文](README.zh-CN.md) | 日本語
-
 # opencode-tui-context
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+**OpenCode のサイドバーで、コンテキスト使用量とトークンの内訳をひと目で確認。**
 
-OpenCode の TUI サイドバーに、現在のセッションのコンテキストウィンドウ使用量を 2 本のセグメントバーで描画します。1 本目は `used` / `reserved` / `free` を示す全体バー、2 本目は `cached` / `prompt` / `think` / `out` を示す構成バーです。このプラグインはホストが提供する `sidebar_content` スロットに登録し、現在のセッションの最後の assistant メッセージの token 統計とモデルの上限を読み取って、各セグメントの割合を計算して描画します。プラグイン id は `opencode-tui-context` です。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![OpenCode: >=1.18.0](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.0-18181b)](#前提条件)
 
-## 機能
+[English](README.md) · [简体中文](README.zh-CN.md) · 日本語
 
-- サイドバーに幅を設定できる 2 本のバーを、上下 1 行ずつで描画します。全体バーは `window` を分母に `used` / `reserved` / `free` の 3 セグメントへ、構成バーは `used` を分母に `cached` / `prompt` / `think` / `out` の 4 セグメントへ分かれます。
-- 各バーの下に 1 行の英字レジェンドが付きます。全体バーは `u` / `r` / `f`、構成バーは `c` / `p` / `t` / `o` の順です。各項目はバーと同じ 1 セルの色ブロックで、色ブロックと英字、英字とそのセグメントの省略カウントの間にそれぞれ 1 スペース入ります。
-- パネル右上に使用率をパーセントで表示します。token の合計は全体バーのレジェンド（`u` / `r` / `f` の 3 つの数値）が担い、独立した行は設けません。
-- セッションに新しいメッセージがあると自動更新します。`message.updated`、`message.part.updated`、`session.updated`、`session.idle` の 4 イベントを購読し、再描画には 50ms の先行スロットルをかけます。アンマウント時にはすべての購読を解除し、定期ポーリングは使いません。
-- assistant メッセージがまだないときは `no assistant turns yet` と表示します。空白にはならず、エラーも出ません。
+2 本のコンパクトなバーで、モデルのコンテキストウィンドウの使用量、出力用の予約分、そして報告されたトークンのキャッシュ・プロンプト・推論・出力の内訳を表示します。
 
-## スコープ
+![コンテキストパネルの表示例：使用率 40%。上段は使用済み・予約分・空き容量、下段はキャッシュ・プロンプト・推論・出力トークンの内訳。](docs/assets/context-preview.svg)
 
-本プロジェクトは意図的に範囲を最小限に保っています。次のことは明確にやりません。パネルはツール単位の token ランキングを行わず、token の推移グラフも作らず、サブエージェントの使用量の分割や表示もせず、tokenizer（例えば tiktoken）を内蔵せず、カスタムツールも登録せず、`/context` コマンドも提供せず、SYSTEM/USER/ASSISTANT のようなロール別の内訳も行いません。反映するのは「output token を持つ最後の assistant メッセージ」という 1 つのスナップショットだけです。
+*サンプル値を使った表示イメージです。黄色の出力セグメントを除き、実際の配色は OpenCode のテーマに従います。*
 
-## 表示
+- **同じスナップショットを 2 つの視点で表示：** 上段はウィンドウ全体の容量、下段は使用済みトークンの内訳。
+- **サイドバーの幅に追従：** バーは自動で伸縮し、幅が狭くなると凡例の配置や表示内容も変わります。
+- **セッションに合わせて更新：** ポーリングを使わず、イベントに応じて更新します。
+- **表示をカスタマイズ：** 個別のセグメントや両方の凡例グループを非表示にできます。
+- **既存の使用量データを利用：** 追加のモデル呼び出し、トークナイザー、認証情報は不要です。
 
-2 本のバーのセグメントの意味と色の対応は次のとおりです。
+このパネルが表示するのは、**出力トークンを持つ最新のアシスタントメッセージ**の情報です。セッション全体の累積請求額や、次のプロンプトの正確なトークン数ではありません。
 
-| バー | segment id | 意味 | 色 token |
-| --- | --- | --- | --- |
-| 全体バー | `used` | input + cacheRead + cacheWrite + reasoning + output | `primary` |
-| 全体バー | `reserved` | `limit.output - output` の予約量 | `textMuted` |
-| 全体バー | `free` | ウィンドウの残り | `text` |
-| 構成バー | `cached` | キャッシュヒットした入力 token（cache read） | `success` |
-| 構成バー | `prompt` | input + cacheWrite | `accent` |
-| 構成バー | `think` | reasoning | `secondary` |
-| 構成バー | `out` | output | `#ffff00`（ハードコード） |
+[クイックスタート](#クイックスタート) · [パネルの見方](#パネルの見方) · [設定](#設定) · [トラブルシューティング](#トラブルシューティング) · [開発](#開発)
 
-`out` 以外の色 token はホストテーマのフィールド名そのもので、値は `api.theme.current.<token>` から取ります。`out` はハードコードした `#ffff00` を使います。
+## クイックスタート
 
-`think` は `secondary`（青系、色相は約 215 度）を使い、パネル内の他のどの色とも色相が約 46 度以上離れています。`out` はハードコードした `#ffff00`、つまり純粋な黄色（色相は約 60 度）を使います。ハードコードしたのは、opencode の既定テーマに明るい黄色がないためです。テーマ標準の黄色はどれも近すぎます。`warning`（`#f5a742`、色相約 34 度）と `markdownEmph`（`#e5c07b`、色相約 39 度）は、`used` セグメントが使う `primary`（色相約 24 度）からわずか 10 から 15 度しか離れておらず、2 つのセルを並べるとほとんど見分けがつきません。これはまさにこのパネルが避けたい色衝突です。またレモンイエローの `diffHighlightAdded`（`#b8db87`、色相約 85 度）は緑寄りで、黄色としては不十分です。ハードコードには代償もあります。`#ffff00` はホストテーマに追従しないため、ライトテーマでは見栄えが適切でないことがあります。パネル上の色は全部で 5 つ（`u` / `c` / `p` / `t` / `o`）で、色選びは「任意の 2 色間の最小色相距離を最大にする」ことを基準にしています。
+### 前提条件
 
-パネルの最外郭には `borderSubtle` 色の枠があり、左右に 1 列ずつ内側余白があります。枠内は上から順にタイトル行、全体バー、構成バー、1 行目のレジェンド、2 行目のレジェンドです。タイトル行の両端は `space-between` で配置し、左は `Context` タイトル、右端は使用率（`42% used` の形）です。
+- **OpenCode `>=1.18.0`**。[package.json](package.json) で宣言している要件です。開発用 SDK は `1.18.31` に固定していますが、それ以降のすべてのホストバージョンで動作確認済みという意味ではありません。
+- 以下の標準インストールコマンドは **OpenCode `1.18.31`** に照らして確認しています。古いバージョンでは `opencode plugin --help` を確認するか、OpenCode を更新してください。
+- npm とビルド済み ZIP のインストールにはローカルでのビルドは不要です。ソースからのインストールにのみ **Git、[Bun](https://bun.sh/)、[Node.js](https://nodejs.org/)** が必要です。
 
-2 本のバーはどちらも行全体を埋め、ブロック文字で描画します。各セグメントは割り当てられたセル数だけ対応する文字を繰り返し、そのセグメントの色で塗ります。全体バーは `window` を分母にし、`used` と `reserved` は塗りつぶしの `▓`（U+2593）、`free` は中抜きの `░`（U+2591）です。埋まらなかった余りはすべて末尾の `free` に足されるので、3 セグメントのセル数の合計はちょうどバー幅になります（`free` が除外されている場合を除く）。構成バーは `used` を分母にし、`cached`、`prompt`、`think`、`out` の 4 セグメントはすべて塗りつぶしの `▓` で、`free` の末尾は意図的に足しません。4 セグメントの合計はバー幅より 0 から 2 セル少なくなることがあり、バー右端にその分の隙間が残ります。
+### npm からインストール（推奨）
 
-2 行のレジェンドは `showLegend` が `true` のときだけ表示されます。1 行目は全体バーに対応し、`u` / `r` / `f` の順です。2 行目は構成バーに対応し、`c` / `p` / `t` / `o` の順です。各項目は 3 つの部分からなり、隣り合う部分の間には 1 スペース入ります。バーと同じ 1 セルの色ブロック（`free` 以外は塗りつぶしの `▓`（U+2593）、`free` は中抜きの `░`（U+2591））、続いて小文字の英字、最後にそのセグメントの省略カウント（`17.4K` など）です。英字は所属セグメントの色を取り、カウントは一律 `textMuted` を使います。
-
-`exclude` で除外されたセグメントは、所属するバーと対応するレジェンド項目の両方から消え、英字とカウントも一緒に消えます。右上のパーセントは全体バーの `used` セグメントと同じ色（`primary`）で、使用量による色分けはしません。2 本のバーの総列数はどちらもパネルの実測幅で決まり、実際の使用可能幅に追従します。パネルが広がれば 2 本とも長くなり、サイドバーが狭まれば 2 本とも短くなり、折り返しはしません。右上のパーセントは常に表示され、バー幅の影響を受けません。
-
-## インストール
-
-前提：`opencode` が使えること、バージョンが「互換性」の節の要件を満たすこと。このプラグインはソースからビルドしたものをローカルディレクトリとして読み込む方式で、パッケージマネージャは経由しません。
-
+```sh
+opencode plugin -g opencode-tui-context
 ```
+
+OpenCode がビルド済みパッケージをダウンロードし、グローバルの `tui.json` に追加します。OpenCode を再起動すると読み込まれます。現在のプロジェクトだけにインストールする場合は `-g` を省略します。コマンドパレットから **Install plugin** を選び、`opencode-tui-context` を入力してグローバルスコープを選択することもできます。ホストの[インストールガイド](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)を参照してください。
+
+ローカルインストールから移行する場合は、`tui.json` の古いパスエントリーを削除し、プラグインの重複を避けてください。
+
+### 代替方法：ビルド済み ZIP
+
+リリースにはビルド済み ZIP が含まれています。npm が利用できない環境ではこちらを使えます。
+
+1. [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases) を開き、**Assets** から `opencode-tui-context-<version>.zip` をダウンロードします。GitHub が自動生成する **Source code** アーカイブはビルドが必要です。
+2. アーカイブ内の `opencode-tui-context` ディレクトリを、`tui.json` と同じ場所にある `local-plugins/` に展開します。既定のグローバル設定では `~/.config/opencode/local-plugins/`（Windows は `$HOME\.config\opencode\local-plugins\`）です。`package.json` と `dist/tui.js` をそのまま保ってください。
+3. 下記の[ローカルプラグイン設定](#ローカルインストールを有効にする)を追加し、OpenCode を再起動します。
+
+### ソースからインストール
+
+<details>
+<summary>プラグインをビルドしてコピーする</summary>
+
+Git、Bun、Node.js が必要です。リポジトリをクローンし、`dist/tui.js` をビルドします。
+
+```sh
 git clone https://github.com/SolitudeRA/opencode-tui-context.git
 cd opencode-tui-context
-bun install
+bun install --frozen-lockfile
 bun run build
-mkdir -p ~/.config/opencode/local-plugins/opencode-tui-context
-cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 ```
 
-最後の手順は `dist/` と `package.json` だけをコピーします。ローカル方式ではソースと開発依存は不要なので、コピー先に入れる必要はありません。
+ビルドすると `dist/tui.js` が生成されます。
 
-次に、コピー先のディレクトリを `~/.config/opencode/tui.json` の `plugin` 配列に書きます。
+リポジトリのルートで、ビルド結果とマニフェストをグローバルのプラグインディレクトリへコピーします。
+
+**macOS / Linux**
+
+```sh
+mkdir -p "$HOME/.config/opencode/local-plugins/opencode-tui-context"
+cp -R dist package.json "$HOME/.config/opencode/local-plugins/opencode-tui-context/"
+```
+
+**Windows PowerShell**
+
+```powershell
+$pluginDir = Join-Path $HOME ".config/opencode/local-plugins/opencode-tui-context"
+New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
+Copy-Item -Path dist, package.json -Destination $pluginDir -Recurse -Force
+```
+
+</details>
+
+### ローカルインストールを有効にする
+
+ZIP またはソースからインストールした場合は、既存の設定やプラグインを残したまま、`~/.config/opencode/tui.json`（Windows では `$HOME\.config\opencode\tui.json`）に次のエントリーを追加します。
 
 ```json
 {
-  "plugin": ["~/.config/opencode/local-plugins/opencode-tui-context"]
+  "plugin": ["./local-plugins/opencode-tui-context"]
 }
 ```
 
-`tui.json` は opencode の起動時に 1 度だけ読まれ、ホットリロードはしません。変更後は `opencode` を再起動すると反映されます。
+次の構成を保ってください。マニフェストの `./tui` エクスポートは `dist/tui.js` を参照します。コピー先にソースファイルや `node_modules` は不要です。
 
-GitHub Release にビルド済みの `tui.js` が添付されている場合は、それをダウンロードしてコピー先に置けば、`bun install` と `bun run build` の 2 手順を省略できます。
+```text
+local-plugins/opencode-tui-context/
+├── package.json
+└── dist/
+    └── tui.js
+```
 
+パスは `tui.json` があるディレクトリを基準とした相対パスです。設定ファイルを別の場所に置いている場合は、コピー先を調整するか、プラグインの絶対パスを指定してください。Windows の JSON 内でも `D:/Codeing/opencode-tui-context` のようにスラッシュを使えます。JSON のプラグインエントリーには `~/...` を使わないでください。`1.18.31` のローダーは `~` を展開しません。ホストの[設定パス解決処理](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/config/plugin.ts#L38-L54)と[プラグインパス判定処理](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/plugin/shared.ts#L158-L176)を参照してください。
+
+### パネルを表示する
+
+設定先は **`tui.json`** です。`opencode.json` のサーバープラグイン一覧には追加しません。OpenCode を再起動し、セッションを開いてサイドバーを表示してください。アシスタントメッセージに出力トークンが報告されると、**Context** パネルに使用量が表示されます。それまでは `no assistant turns yet` と表示されます。
+
+OpenCode 内蔵のコンテキストパネルを置き換える場合は、次の設定も追加します。
+
+```json
+{
+  "plugin_enabled": {
+    "internal:sidebar-context": false
+  }
+}
+```
+
+両方のパネルが表示される場合は、OpenCode のプラグインマネージャーに保存された有効・無効の状態を確認してください。保存済みの状態が設定ファイルより優先される場合があります。他のサイドバープラグインは有効なままで構いません。有効状態の優先順位については、ホストの [TUI プラグインガイド](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md)を参照してください。
+
+## パネルの見方
+
+**上のバー**は、モデルのコンテキストウィンドウを使用済み・予約分・空きに分けて表示します。**下のバー**は、使用済みトークンだけを 4 つの区分に分けて表示します。分母が異なるため、上のバーに空きが多くても、下のバーがいっぱいになることがあります。
+
+| バー | 凡例 | セグメント | 意味 |
+| --- | --- | --- | --- |
+| 全体 | `u` | `used` | 入力 + キャッシュ読み取り + キャッシュ書き込み + 推論 + 出力 |
+| 全体 | `r` | `reserved` | モデルの出力上限から報告済みの出力を引いた値。最小値はゼロ |
+| 全体 | `f` | `free` | コンテキストウィンドウから使用済みと予約分を引いた値。最小値はゼロ |
+| 内訳 | `c` | `cached` | キャッシュ読み取りトークン |
+| 内訳 | `p` | `prompt` | 入力 + キャッシュ書き込みトークン |
+| 内訳 | `t` | `think` | 推論トークン |
+| 内訳 | `o` | `out` | 出力トークン |
+
+タイトルには `used / window` を四捨五入したパーセントで表示します。凡例の数値には `17.5K` のような省略表記を使います。濃い `▓` のセルは使用済みまたは予約分、`░` のセルは全体バーの空き容量を表します。
+
+幅が狭くなると、各凡例グループはまず数値をマーカーの下に移し、さらに狭くなると数値を隠し、最後にグループ全体を隠します。タイトルはパーセント表示を先に隠し、その後に `Context` を隠します。サイドバーを広げると詳細が再び表示されます。
+
+ほとんどの色はホストテーマから取得します。対応は `used` → `primary`、`cached` → `success`、`prompt` → `accent`、`think` → `secondary`、`reserved` → `textMuted`、`free` → `text` です。出力には固定の黄色（`#ffff00`）を使うため、ライトテーマではコントラストが低くなる場合があります。
 
 ## 設定
 
-オプションは `plugin` 配列のタプルの 2 番目に書きます。形は `["<spec>", { ... }]` で、`<spec>` はローカルディレクトリのパスです。
+npm からインストールした場合、`tui.json` のパッケージエントリーを `[package, options]` のタプルに置き換えます。既存のエントリーに `@version` があり、そのバージョンを維持したい場合は接尾辞を残してください。
 
 ```json
 {
   "plugin": [
     [
-      "~/.config/opencode/local-plugins/opencode-tui-context",
-      { "barWidth": 40, "exclude": ["free"], "showLegend": true }
+      "opencode-tui-context",
+      {
+        "barWidth": 24,
+        "exclude": [],
+        "showLegend": true
+      }
     ]
   ]
 }
 ```
 
-| オプション | 既定値 | ルールとフォールバック |
-| --- | --- | --- |
-| `barWidth` | `24` | パネルの実測幅が出るまでの初期バー幅（文字数）。まず四捨五入し、次に `8-120` にクランプします。数値でない場合や有限でない値（`NaN`、`±Infinity`）は `24` にフォールバックします。`0` は `8` に、`999` は `120` にクランプされます。初回フレーム以降のバー幅はパネルの実測幅で決まり自動追従するため、`barWidth` は未計測時のフォールバックとしてだけ働きます。 |
-| `exclude` | `[]` | 2 本のバーと対応するレジェンドから隠す segment id のリスト。受け付けるのは `cached`、`prompt`、`think`、`out`、`reserved`、`free` の 6 つのみで、不正な値は捨てられ、重複は除去して最初に現れた順序を保ちます。配列でない場合は `[]` にフォールバックします。 |
-| `showLegend` | `true` | 2 行の英字レジェンドを表示するかどうか。真偽値でない場合は `true` にフォールバックします。`false` にすると 2 行のレジェンドだけが隠れ、2 本のバーと右上のパーセントは残ります。 |
+ZIP またはソースからインストールした場合、この例のパッケージ名を `"./local-plugins/opencode-tui-context"` に置き換えます。既存のエントリーを編集し、重複して追加しないでください。
 
-すべてのオプションは正規化されます。設定が欠けている場合、`null` の場合、型が違う場合、さらにはオプションオブジェクトがオブジェクトですらない場合でも例外は投げず、必ず上の表の既定値にフォールバックします。
+| オプション | 型 | 既定値 | 動作 |
+| --- | --- | --- | --- |
+| `barWidth` | `number` | `24` | 幅を測定する前の**パネル外寸の初期幅**です。四捨五入したうえで `8–120` に収めます。バーには枠線と余白を除いた 4 列分狭い幅を使います。測定後は実際のサイドバー幅に追従します。バーの幅を固定する設定ではありません。 |
+| `exclude` | `string[]` | `[]` | `cached`、`prompt`、`think`、`out`、`reserved`、`free` の各セグメントとその凡例を非表示にします。`used` は非表示にできません。 |
+| `showLegend` | `boolean` | `true` | 幅に余裕があるときに 2 つの凡例グループを表示します。`false` にすると凡例を隠し、バーとタイトルを残します。 |
 
-## 計算方法
+オプションの型が不正な場合は既定値を使い、未知のセグメント ID や重複した ID は取り除きます。表示を簡素にするには `"showLegend": false`、末尾の空き部分を省くには `"exclude": ["free"]` を指定します。
 
-計測対象のメッセージの token 統計を `input`、`cacheRead`、`cacheWrite`、`reasoning`、`output`、そのメッセージが使ったモデルのコンテキスト上限と出力上限を `limit.context`、`limit.output` とします。各量の定義は次のとおりです。
+セグメントを除外しても、使用済みトークンの合計やパーセントは変わりません。内訳バーでは、残ったセグメントを引き伸ばしてバーを埋めることもありません。**`free` を残して `reserved` を隠すと、予約分のセルが見た目上は末尾の空き部分に含まれますが、空きトークン数の計算では引き続き予約分を差し引きます。** バー末尾の長さと空きトークン数を比較する場合は、`reserved` を表示したままにしてください。
 
-```
+設定を変更したり、ビルド済みプラグインを差し替えたりした後は、OpenCode を再起動してください。
+
+## 使用量の計算方法
+
+プラグインは現在のセッションを末尾からたどり、数値の `tokens.output > 0` を持つ最新のアシスタントメッセージを探します。そのメッセージのトークン情報を読み取り、メッセージ自身の `providerID` / `modelID` に対応する上限を参照します。その後に別のモデルへ切り替えていても、測定対象のメッセージを生成したモデルを使います。
+
+```text
 used     = input + cacheRead + cacheWrite + reasoning + output
-window   = limit.context
-reserved = max(0, limit.output - output)
-free     = max(0, window - used - reserved)
 prompt   = input + cacheWrite
-percent  = min(100, round(used / window * 100))
+window   = model.limit.context
+reserved = max(0, model.limit.output - output)
+free     = max(0, window - used - reserved)
+percent  = min(100, round(used / window × 100))
 ```
 
-補足：
+欠落した、または不正なトークン数はゼロとして扱います。プラグインは各フィールドを自ら合計し、`tokens.total` は使いません。正の出力上限を取得できない場合、`reserved` はゼロになります。正のコンテキスト上限を取得できない場合、全体バーは空になり、`free` と表示上のパーセントはゼロになりますが、内訳バーにはトークンを表示できます。**この場合の `0% used` は、使用量がゼロという意味ではなく、容量が不明という意味です。**
 
-- 計測対象はセッション内で最新の、`tokens.output > 0` を持つ assistant メッセージです。メッセージ一覧を末尾から前にたどり、`role === "assistant"` と `tokens.output > 0` を同時に満たす最初のメッセージがデータ源になります。
-- `window` が `0` のとき（モデル上限が取得できないとき）は `free` と `percent` がともに `0` になり、全体バーは分母がないため全体が空になり、構成バーと 2 行のレジェンドは通常どおり描画されます。
-- `reserved` は `limit.output > 0` のときだけ計算し、それ以外は `0` です。
-- 全体バーの `used` と `reserved` は `round(セグメント token / window * barWidth)` で配分し、埋まらなかった余りはすべて末尾の `free` セグメントに足します（`free` が `exclude` にある場合を除く）。3 セグメントの合計はちょうどバー幅になります。
-- 構成バーの `cached`、`prompt`、`think`、`out` は `round(セグメント token / used * barWidth)` で配分し、`free` の末尾は意図的に足しません。4 セグメントの合計はバー幅より 0 から 2 セル少なくなることがあります。
-- 視覚的な下限は 2 本のバーの両方に効きます。`token > 0` のセグメントが四捨五入で `1` セル未満になる場合、`1` セルに引き上げ、セグメントがバーから消えるのを防ぎます。セルを補うときはまず未配分の余りから引き、余りが足りなければ現在最も幅の広いセグメントから 1 セル借ります。どちらからもセルを出せない場合、そのセグメントは表示されません。
-- token 数が `> 0` のセグメントだけがバーに入ります。両方のレジェンド行は除外されていないセグメントをすべて並べるため、token 数が `0` のセグメントも `0` という表示でレジェンドに現れます。
+`reserved` はモデルの出力上限をもとにした表示用の計算値です。OpenCode 内でトークンを実際に予約するものでも、次の応答を予測するものでも、自動圧縮のしきい値を表すものでもありません。数値は OpenCode とプロバイダーが報告する使用量データに依存し、プラグインがメッセージ本文をトークン化することはありません。他のターン、サブエージェント、ツール、メッセージのロールごとの集計は行わず、コマンドやカスタムツールも追加しません。
 
-## 互換性
+<details>
+<summary>バーの丸め処理と更新動作</summary>
 
-- 実測した `opencode` のバージョンは `1.18.31` で、`package.json` の engines が要求するのは `>=1.18.0` です。
-- `@opentui/solid` が本プロジェクトで実際に解決されたバージョンは `0.4.5` で、`package.json` の peer 要求は `>=0.4.5` です。
-- ホストは本プラグインの `@opentui/solid` と `solid-js` のインポートを、ホスト自身が持つモジュールへ書き換えます。つまりプラグインの `devDependencies` のバージョンはビルド成果物の形に影響するだけで、実行時のモジュール解決は決めません。実行時はホスト自身のものを使います。
-- 本プラグインに実行時依存はありません（`dependencies` は空）。成果物はホストが提供するモジュールと Node 組み込みモジュールだけを参照します。
+各セグメントには、利用可能な文字セル数に対する割合を四捨五入し、残り幅を上限としてセルを割り当てます。トークン数が正でも丸め結果がゼロになるセグメントには、未割り当て分や幅の広いセグメントから余地を確保できる場合、最低 1 セルを割り当てます。全体バーは `free` が除外されていなければ残りのセルを `free` で埋めますが、内訳バーでは丸めによる隙間をそのまま残します。そのため、セルの幅はおおよその比率を示すもので、特に小さなセグメントでは誤差が目立つことがあります。
 
-## 他のプラグインとの共存
+プラグインは `message.updated`、`message.part.updated`、`session.updated`、`session.idle` を購読します。50 ms の先行エッジスロットルにより、その間に発生したイベントは無視されます。ポーリングや、間隔の終了後に再更新するタイマーはありません。プラグインの終了処理で購読を解除します。新しい応答の出力トークンが報告されるまでは、前のスナップショットが表示される場合があります。
 
-`sidebar_content` はホストが提供する共有スロットで、複数のプラグインが同じスロットに内容を登録できます。本プラグインはこのスロットに `order: 60` で登録します。`order` の値はプラグインの実装で定義され、`tui.json` には書きません。
+</details>
 
-別のプラグインも `sidebar_content` にコンテキストパネルを書いている場合、両方を有効にするとサイドバーに内容の重なったパネルが 2 つ現れます。そのときはどちらか一方だけを残してください。不要な方を `tui.json` の `plugin` 配列から外します。
+## トラブルシューティング
 
-ホスト内蔵のコンテキストパネルも同じスロットに登録します。本プラグインと重ねたくない場合は、`tui.json` の `plugin_enabled` で `"internal:sidebar-context"` を `false` にします。本プラグインは `plugin_enabled` に項目がないため、有効のままです。
+| 症状 | 確認すること |
+| --- | --- |
+| インストールコマンドが使えない | `opencode plugin --help` を確認してください。本ガイドの標準インストール手順は `1.18.31` に基づきます。OpenCode を更新するか、ローカルインストールを利用してください。 |
+| npm でパッケージが見つからない | パッケージ名、指定バージョン、レジストリへの接続を確認してください。npm が利用できない場合は、ビルド済み ZIP を使えます。 |
+| パネルが表示されない | OpenCode のバージョン、サイドバーの表示状態、`tui.json` のエントリー、プラグインマネージャーの有効状態を確認してください。ローカルインストールでは `package.json` + `dist/tui.js` の配置も確認します。変更後は再起動してください。 |
+| `no assistant turns yet` と表示される | 正の出力トークン数を報告したアシスタントメッセージがまだありません。出力トークン数がゼロのメッセージは対象になりません。 |
+| トークンは表示されるが全体バーが空 / `0% used` になる | 測定対象のメッセージを生成したモデルについて、正のコンテキスト上限を取得できていません。そのモデルのプロバイダーメタデータを確認してください。 |
+| サイドバーを狭くすると数値やパーセントが消える | 幅に収まらない詳細情報は自動で非表示になります。ターミナルまたはサイドバーを広げてください。`barWidth` で測定済みの幅を上書きすることはできません。 |
+| コンテキストパネルが 2 つ表示される | 内蔵の `internal:sidebar-context` パネル、または同じ情報を表示する別のプラグインを無効にしてください。`plugin_enabled` が効かないように見える場合は、プラグインマネージャーに保存された状態を確認します。 |
+| 請求用の合計や次のプロンプトの値と一致しない | 表示しているのは、報告済みの 1 つのアシスタントメッセージのスナップショットです。複数ターンの合計でも、請求額の計算でも、トークナイザーによる計測でもありません。 |
 
-## 無効化とアンインストール
+解決しない場合は、OpenCode のバージョン、OS・ターミナル、プラグインのオプション、最小限の再現手順を添えて [Issue を作成](https://github.com/SolitudeRA/opencode-tui-context/issues)してください。表示上の問題には、機密情報を伏せたスクリーンショットも添えてください。
 
-一時的に無効化するだけで、ファイルを残して後で再有効化したい場合：`~/.config/opencode/tui.json` を開き、`plugin` 配列から `~/.config/opencode/local-plugins/opencode-tui-context` の項目を外すだけです。ホスト内蔵のコンテキストパネルを戻したい場合は、`plugin_enabled` で `"internal:sidebar-context"` を `true` にします。
+## 更新と削除
 
-完全にアンインストールする場合：まず上の手順で無効化し、次にローカルディレクトリを削除します。
+**npm：**`<version>` を公開済みのバージョンに置き換えて実行します。
 
-```
-rm -rf ~/.config/opencode/local-plugins/opencode-tui-context
-```
-
-`tui.json` を変更するときは、先にバックアップを取り、ハッシュを記録しておくのがよいでしょう。
-
-```
-B=/tmp/tui.json.before-$(date +%s%N)
-cp ~/.config/opencode/tui.json "$B"
-sha256sum "$B"
+```sh
+opencode plugin -g "opencode-tui-context@<version>" --force
 ```
 
-復元するときはバックアップをコピーし直し、ハッシュがバックアップと一致することを確認します。
+プロジェクト単位のインストールでは `-g` を省略します。OpenCode `1.18.31` では、`--force` が設定内のパッケージバージョンを置き換え、タプルのオプションは維持します。明示したバージョンは固定され、パッケージ名だけの場合は `latest` に追従します。更新後は OpenCode を再起動してください。ホストの[更新動作の説明](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)を参照してください。
 
-```
-cp /tmp/tui.json.before-<timestamp> ~/.config/opencode/tui.json
-sha256sum ~/.config/opencode/tui.json
+**ZIP：**新しいビルド済みアセットをダウンロードし、`tui.json` のパスを変えずにインストール先ディレクトリを置き換えます。**ソース：**ローカルで変更していないチェックアウトで `git pull --ff-only` を実行し、ビルドとコピーの手順を繰り返します。完了後、OpenCode を再起動します。
+
+読み込みを停止するには、`tui.json` の `plugin` 配列からエントリーを削除し、再起動します。ローカルインストールの場合は、コピーした `local-plugins/opencode-tui-context` ディレクトリも削除できます。OpenCode `1.18.31` にプラグインのアンインストールコマンドはなく、設定を削除しても npm キャッシュは残ります。内蔵のコンテキストパネルを無効にしていた場合は、`plugin_enabled` またはプラグインマネージャーで再び有効にしてください。
+
+## 開発
+
+開発には Git、Bun、Node.js を使います。リポジトリをクローンした後に実行してください。
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun test
+bun run build
 ```
 
-`tui.json` は opencode の起動時に 1 度だけ読まれ、ホットリロードはしません。変更後は `opencode` を再起動すると反映されます。
+npm パッケージ、ビルド済み ZIP、チェックサムをローカルで生成するには：
+
+```sh
+npm run release:pack
+```
+
+成果物は `release/` に出力されます。このコマンドは公開を行いません。初回の npm 設定、自動公開、ホストへのインストール確認については[リリースガイド](docs/releasing.md)を参照してください。
+
+テストでは、オプションの正規化、使用量の計算、バーのセル割り当て、配色、凡例、狭い幅での動作を検証します。OpenCode 内でのスモークテストも必要です。UI を変更した後は、空のセッション、トークンデータを持つ応答、狭いサイドバー、他のプラグインとの併用を確認してください。
+
+| ファイル | 役割 |
+| --- | --- |
+| [`src/tui.tsx`](src/tui.tsx) | プラグインモジュールと ID（`opencode-tui-context`） |
+| [`src/plugin.tsx`](src/plugin.tsx) | イベント購読と、順序 `60` での `sidebar_content` 登録 |
+| [`src/panel.tsx`](src/panel.tsx) | テーマの配色、モデルの参照、幅に応じた描画 |
+| [`src/usage.ts`](src/usage.ts) | メッセージの選択と使用量の計算 |
+| [`src/format.ts`](src/format.ts) | 数値の省略表記と文字セルの割り当て |
+| [`src/options.ts`](src/options.ts) | 設定の既定値と検証 |
+| [`scripts/build.mjs`](scripts/build.mjs) | esbuild による ESM バンドルの生成 |
+| [`scripts/release.mjs`](scripts/release.mjs) | npm パッケージ、ビルド済み ZIP、SHA-256 チェックサムの生成と検証 |
+
+バンドルでは OpenTUI と Solid のインポートを外部参照として残し、ホストが提供するモジュールを使います。マニフェストには省略可能な peer dependencies を宣言し、実行時の `dependencies` はありません。インストール先に開発用依存関係をコピーする必要はありません。
+
+コントリビューションを歓迎します。変更の範囲を絞り、上記のチェックを実行したうえで、プルリクエストにはユーザーから見える動作と検証内容を記載してください。動作を変更する場合は関連するテストを更新し、[英語](README.md)・[中国語](README.zh-CN.md)・[日本語](README.ja.md)のガイドを揃えてください。大きなスコープ変更は、先に Issue で相談してください。
 
 ## ライセンス
 
-本プロジェクトは MIT ライセンスで公開されています。全文は [LICENSE](LICENSE) を参照してください。
+[MIT](LICENSE) © opencode-tui-context contributors.

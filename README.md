@@ -1,165 +1,270 @@
-English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
-
 # opencode-tui-context
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+**See context usage and token composition at a glance in the OpenCode sidebar.**
 
-In OpenCode's TUI sidebar, this plugin draws the current session's context-window usage as two segmented bars: an overview bar showing `used` / `reserved` / `free`, and a composition bar showing `cached` / `prompt` / `think` / `out`. It registers the host-provided `sidebar_content` slot, reads the token counts and model limits of the session's last assistant message, computes each segment's share and renders them. The plugin id is `opencode-tui-context`.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![OpenCode: >=1.18.0](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.0-18181b)](#requirements)
 
-## Features
+English · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
-- Renders two configurable-width bars in the sidebar, one above the other: the overview bar uses `window` as its denominator and splits into `used` / `reserved` / `free`; the composition bar uses `used` as its denominator and splits into `cached` / `prompt` / `think` / `out`.
-- Each bar has its own row of letter legend beneath it: `u` / `r` / `f` for the overview bar, `c` / `p` / `t` / `o` for the composition bar. Each entry is a single-cell swatch styled like the bar, with one space between the swatch and the letter and one space between the letter and that segment's compact count.
-- Shows the percentage used in the panel's top-right corner; the token totals live on the overview legend row (the three numbers for `u` / `r` / `f`) instead of on a line of their own.
-- Refreshes automatically when the session gets a new message: it subscribes to `message.updated`, `message.part.updated`, `session.updated` and `session.idle`, throttles repaints with a 50ms leading edge, and clears every subscription on unmount without ever polling on a timer.
-- Shows `no assistant turns yet` before there is any assistant message, so the panel is neither blank nor an error.
+Two compact bars show how much of your model's context window is used, how much is reserved for output, and how the reported tokens break down into cache, prompt, reasoning, and output.
 
-## Scope
+![Illustrative context panel: 40 percent used, with used, reserved, and free capacity above a breakdown of cached, prompt, reasoning, and output tokens.](docs/assets/context-preview.svg)
 
-The project is deliberately minimal. These things are explicitly out of scope: the panel does no per-tool token ranking, no token trend chart, does not break down or display subagent usage, ships no built-in tokenizer (tiktoken, for instance), registers no custom tools, offers no `/context` command, and does no SYSTEM/USER/ASSISTANT role attribution. It reflects exactly one snapshot: the last assistant message that carries output tokens.
+*Illustration with sample counts; actual colors follow your OpenCode theme, except for the yellow output segment.*
 
-## Display
+- **Two views of the same snapshot:** window capacity above, used-token composition below.
+- **Fits the sidebar:** bars resize automatically; legends stack or simplify as space narrows.
+- **Updates with the session:** event-driven refresh without polling.
+- **Configurable display:** hide individual segments or both legend groups.
+- **Reads existing usage data:** no extra model calls, tokenizer, or credentials.
 
-The bars' segments and their colours are listed below.
+The panel reflects the **latest assistant message with output tokens**, not a cumulative session bill or an exact measurement of the next prompt.
 
-| Bar | segment id | Meaning | Colour token |
-| --- | --- | --- | --- |
-| Overview | `used` | input + cacheRead + cacheWrite + reasoning + output | `primary` |
-| Overview | `reserved` | the amount reserved by `limit.output - output` | `textMuted` |
-| Overview | `free` | remaining window | `text` |
-| Composition | `cached` | cached input tokens (cache read) | `success` |
-| Composition | `prompt` | input + cacheWrite | `accent` |
-| Composition | `think` | reasoning | `secondary` |
-| Composition | `out` | output | `#ffff00` (hardcoded) |
+[Quick start](#quick-start) · [Reading the panel](#reading-the-panel) · [Configuration](#configuration) · [Troubleshooting](#troubleshooting) · [Development](#development)
 
-Except for `out`, a colour token is a field name in the host theme, resolved from `api.theme.current.<token>`; `out` uses the hardcoded `#ffff00`.
+## Quick start
 
-`think` uses `secondary`, a blue at a hue of about 215 degrees and at least about 46 degrees of hue away from every other colour in the panel. `out` uses the hardcoded `#ffff00`, pure yellow at a hue of about 60 degrees, and the reason it is hardcoded is that the default opencode theme has no bright yellow. The theme's own yellows all sit too close: `warning` (`#f5a742`, hue about 34 degrees) and `markdownEmph` (`#e5c07b`, hue about 39 degrees) are only 10 to 15 degrees of hue from the `primary` (hue about 24 degrees) used by the `used` segment, so two adjacent swatches are nearly indistinguishable, the exact collision this panel has to avoid; and the lemon-green `diffHighlightAdded` (`#b8db87`, hue about 85 degrees) leans green rather than yellow. Hardcoding has a cost as well: `#ffff00` does not follow the host theme, so it looks out of place under a light theme. The panel has five colours in total (`u` / `c` / `p` / `t` / `o`), chosen to maximise the smallest hue distance between any two of them.
+### Requirements
 
-The panel's outermost element is a border coloured `borderSubtle`, with one column of padding on each side. Inside, top to bottom, come the title row, the overview bar, the composition bar, the first legend row and the second legend row. The title row is split with `space-between`: `Context` on the left, the usage percentage (like `42% used`) on the right.
+- **OpenCode `>=1.18.0`**, as declared in [package.json](package.json). The development SDK is pinned to `1.18.31`; this is not a guarantee that every later host version has been tested.
+- The native installation commands below were checked against **OpenCode `1.18.31`**. On older versions, check `opencode plugin --help` or upgrade.
+- npm and prebuilt ZIP installations require no local build. Only source installation needs **Git, [Bun](https://bun.sh/), and [Node.js](https://nodejs.org/)**.
 
-Both bars span the full row and are drawn with block characters: each segment repeats its character for the cells it receives and colours it with the segment colour. The overview bar uses `window` as its denominator; `used` and `reserved` are solid `▓` (U+2593), `free` is hollow `░` (U+2591); the unused remainder is all appended as a trailing `free` segment, so the three segments' cells sum to exactly the bar width (unless `free` is excluded). The composition bar uses `used` as its denominator; `cached`, `prompt`, `think` and `out` are all solid `▓`, and no `free` tail is appended on purpose, so the four segments may sum to 0 to 2 cells less than the bar width, leaving that small gap at the bar's right end.
+### Install from npm (recommended)
 
-The two legend rows appear only when `showLegend` is `true`. The first row matches the overview bar, in the order `u` / `r` / `f`; the second matches the composition bar, in the order `c` / `p` / `t` / `o`. Each entry has three parts, with one space between adjacent parts: a single-cell swatch styled like the bar, solid `▓` (U+2593) for non-`free` segments and hollow `░` (U+2591) for `free`; then a lowercase letter; then that segment's compact count (like `17.4K`). The letter takes the segment's colour and the count always uses `textMuted`.
-
-A segment hidden by `exclude` disappears from both its bar and its legend entry, letter and count included. The percentage in the top-right corner uses the same colour as the overview bar's `used` segment (`primary`) and does not change colour with the usage level. Both bars take their total column count from the panel's measured width and adapt to the actual available width: when the panel widens both bars lengthen together, and when the sidebar narrows both bars shorten together, without wrapping; the top-right percentage stays fixed and is unaffected by the bar width.
-
-## Install
-
-Prerequisite: `opencode` must be available, at a version that satisfies the "Compatibility" section. The plugin is built from source and loaded as a local directory; it does not go through any package manager.
-
+```sh
+opencode plugin -g opencode-tui-context
 ```
+
+OpenCode downloads the prebuilt package and adds it to the global `tui.json`. Restart OpenCode to load it. To install only for the current project, omit `-g`. You can also choose **Install plugin** in the command palette, enter `opencode-tui-context`, and select global scope. See the host's [installation guide](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install).
+
+If migrating from a local installation, remove its old path entry from `tui.json` so the plugin is listed only once.
+
+### Alternative: prebuilt ZIP
+
+Releases include a prebuilt ZIP for installation when npm is unavailable:
+
+1. Open [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases) and download `opencode-tui-context-<version>.zip` from **Assets**. GitHub's **Source code** archives still require a build.
+2. Extract the included `opencode-tui-context` directory into `local-plugins/` beside your `tui.json`. The default global location is `~/.config/opencode/local-plugins/` (`$HOME\.config\opencode\local-plugins\` on Windows). Keep `package.json` and `dist/tui.js` together.
+3. Add the [local plugin entry](#enable-a-local-installation) below, then restart OpenCode.
+
+### Install from source
+
+<details>
+<summary>Build and copy the plugin</summary>
+
+Requires Git, Bun, and Node.js. Clone the repository and build `dist/tui.js`:
+
+```sh
 git clone https://github.com/SolitudeRA/opencode-tui-context.git
 cd opencode-tui-context
-bun install
+bun install --frozen-lockfile
 bun run build
-mkdir -p ~/.config/opencode/local-plugins/opencode-tui-context
-cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 ```
 
-The last step copies only `dist/` and `package.json`; the local approach has no use for the source or the development dependencies, so there's no need to put them in the target directory.
+The build produces `dist/tui.js`.
 
-Next, add the target directory to the `plugin` array in `~/.config/opencode/tui.json`:
+From the repository root, copy the build and manifest to the global plugin directory.
+
+**macOS / Linux**
+
+```sh
+mkdir -p "$HOME/.config/opencode/local-plugins/opencode-tui-context"
+cp -R dist package.json "$HOME/.config/opencode/local-plugins/opencode-tui-context/"
+```
+
+**Windows PowerShell**
+
+```powershell
+$pluginDir = Join-Path $HOME ".config/opencode/local-plugins/opencode-tui-context"
+New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
+Copy-Item -Path dist, package.json -Destination $pluginDir -Recurse -Force
+```
+
+</details>
+
+### Enable a local installation
+
+For ZIP or source installations, merge this entry into `~/.config/opencode/tui.json` (`$HOME\.config\opencode\tui.json` on Windows), preserving your other settings and plugins:
 
 ```json
 {
-  "plugin": ["~/.config/opencode/local-plugins/opencode-tui-context"]
+  "plugin": ["./local-plugins/opencode-tui-context"]
 }
 ```
 
-`tui.json` is read only once when opencode starts and is not hot-reloaded, so `opencode` has to be restarted before the change takes effect.
+Keep this layout: the manifest's `./tui` export points to `dist/tui.js`. Source files and `node_modules` are not needed in the destination.
 
-If the maintainer attaches a built `tui.js` to a GitHub Release, you can download it into the target directory and skip both the `bun install` and `bun run build` steps.
+```text
+local-plugins/opencode-tui-context/
+├── package.json
+└── dist/
+    └── tui.js
+```
 
+The path is relative to the directory containing `tui.json`. If you use a custom config location, adjust the copy destination or use an absolute plugin path; Windows JSON paths can use forward slashes, such as `D:/Codeing/opencode-tui-context`. Avoid `~/...` inside the JSON plugin entry: the `1.18.31` loader does not expand it. See the host's [config path resolver](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/config/plugin.ts#L38-L54) and [plugin path detection](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/plugin/shared.ts#L158-L176).
+
+### Show the panel
+
+Use **`tui.json`**, rather than the server plugin list in `opencode.json`. Restart OpenCode, open a session, and show the sidebar. After an assistant message reports output tokens, the **Context** panel displays its usage; until then it shows `no assistant turns yet`.
+
+To replace OpenCode's built-in context panel, also merge this setting:
+
+```json
+{
+  "plugin_enabled": {
+    "internal:sidebar-context": false
+  }
+}
+```
+
+If both panels remain visible, check the saved enable/disable state in OpenCode's plugin manager; it can override the config setting. Other sidebar plugins can remain enabled. See the host's [TUI plugin guide](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md) for enable-state precedence.
+
+## Reading the panel
+
+The **top bar** divides the model's context window into used, reserved, and free space. The **bottom bar** divides only the used tokens into four categories. Their denominators differ, so the lower bar can be full when the upper bar is mostly free.
+
+| Bar | Legend | Segment | What it represents |
+| --- | --- | --- | --- |
+| Overview | `u` | `used` | Input + cache read + cache write + reasoning + output |
+| Overview | `r` | `reserved` | Model output limit minus reported output, floored at zero |
+| Overview | `f` | `free` | Context window minus used and reserved, floored at zero |
+| Composition | `c` | `cached` | Cache-read tokens |
+| Composition | `p` | `prompt` | Input + cache-write tokens |
+| Composition | `t` | `think` | Reasoning tokens |
+| Composition | `o` | `out` | Output tokens |
+
+The title shows `used / window` as a rounded percentage. Legend counts use compact notation, such as `17.5K`. Solid `▓` cells show usage or reservation; `░` cells show the overview bar's remaining space.
+
+When space is tight, each legend group moves its counts below the markers, then hides the counts, then hides the group. The title drops the percentage before hiding `Context`. Widening the sidebar restores the details.
+
+Most colors come from the host theme: `used` → `primary`, `cached` → `success`, `prompt` → `accent`, `think` → `secondary`, `reserved` → `textMuted`, and `free` → `text`. Output uses fixed yellow (`#ffff00`), which may have lower contrast on light themes.
 
 ## Configuration
 
-Options go in the second element of the `plugin` array tuple, in the form `["<spec>", { ... }]`, where `<spec>` is the local directory path.
+For npm installations, replace the package entry in `tui.json` with a `[package, options]` tuple. Keep an existing `@version` suffix if you want to stay on that version:
 
 ```json
 {
   "plugin": [
     [
-      "~/.config/opencode/local-plugins/opencode-tui-context",
-      { "barWidth": 40, "exclude": ["free"], "showLegend": true }
+      "opencode-tui-context",
+      {
+        "barWidth": 24,
+        "exclude": [],
+        "showLegend": true
+      }
     ]
   ]
 }
 ```
 
-| Option | Default | Rules and fallback |
-| --- | --- | --- |
-| `barWidth` | `24` | The initial bar width (in characters) before the panel's measured width is available. It is rounded first, then clamped to `8-120`. A non-number or non-finite value (`NaN`, `±Infinity`) falls back to `24`; `0` is clamped to `8`, `999` to `120`. After the first frame the bar width comes from the panel's measured width and follows it automatically; `barWidth` only covers the time before a measurement exists. |
-| `exclude` | `[]` | A list of segment ids to hide from both bars and their legend entries. It accepts only the six values `cached`, `prompt`, `think`, `out`, `reserved`, `free`; invalid values are dropped, and duplicates are de-duplicated keeping the order of first appearance. A non-array falls back to `[]`. |
-| `showLegend` | `true` | Whether to show the two letter legend rows. A non-boolean falls back to `true`. When set to `false`, only the two legend rows are hidden; both bars and the top-right percentage stay. |
+For a ZIP or source installation, use `"./local-plugins/opencode-tui-context"` in place of the package name in this example. Edit the existing entry; do not add a second copy.
 
-Every option is normalized. A missing config, `null`, a wrong type, or even an options object that is not an object at all never throws: they all fall back to the defaults in the table above.
+| Option | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `barWidth` | `number` | `24` | Initial **outer panel width** before measurement, rounded and clamped to `8–120`. The bars subtract four columns for borders and padding. Once measured, the panel follows the actual sidebar width. This does not set a fixed bar width. |
+| `exclude` | `string[]` | `[]` | Hide any of `cached`, `prompt`, `think`, `out`, `reserved`, or `free` and their legend entries. `used` cannot be hidden. |
+| `showLegend` | `boolean` | `true` | Show the two legend groups when space permits. `false` keeps the bars and title without legends. |
 
-## Computation
+Invalid option types fall back to defaults; unknown or duplicate segment IDs are discarded. For a simpler panel, use `"showLegend": false`; to omit the free tail, use `"exclude": ["free"]`.
 
-Let `input`, `cacheRead`, `cacheWrite`, `reasoning` and `output` be the token counts of the measured message, and `limit.context` and `limit.output` the context and output limits of the model that message used. The quantities are defined as follows:
+Exclusions do not change the used total or percentage, and visible composition segments are not rescaled to fill the bar. **If you hide `reserved` while keeping `free`, its cells become part of the visual free tail, but the free token count still subtracts the reservation.** Keep `reserved` visible when comparing that tail with its numeric count.
 
-```
+Restart OpenCode after changing the configuration or replacing the built plugin.
+
+## How usage is calculated
+
+The plugin scans the current session backwards for the newest assistant message with numeric `tokens.output > 0`. It reads that message's token fields and looks up the limits of its own `providerID` / `modelID`, even if you have since selected a different model.
+
+```text
 used     = input + cacheRead + cacheWrite + reasoning + output
-window   = limit.context
-reserved = max(0, limit.output - output)
-free     = max(0, window - used - reserved)
 prompt   = input + cacheWrite
-percent  = min(100, round(used / window * 100))
+window   = model.limit.context
+reserved = max(0, model.limit.output - output)
+free     = max(0, window - used - reserved)
+percent  = min(100, round(used / window × 100))
 ```
 
-A few notes:
+Missing or invalid token counts become zero. The plugin sums these fields itself; it does not use `tokens.total`. If no positive output limit is available, `reserved` is zero. If no positive context limit is available, the overview bar is empty and `free` and the displayed percentage are zero; the composition can still show tokens. **In that case, `0% used` means the capacity is unknown, not that usage is empty.**
 
-- The measured object is the newest assistant message in the session that carries `tokens.output > 0`. Scanning the message list backwards from the end, the first message that satisfies both `role === "assistant"` and `tokens.output > 0` is the data source.
-- When `window` is `0` (the model's limit cannot be obtained), both `free` and `percent` are `0`, the overview bar is left entirely empty because it has no denominator, and the composition bar and both legend rows render as usual.
-- `reserved` is computed only when `limit.output > 0`; otherwise it is `0`.
-- The overview bar's `used` and `reserved` are allocated by `round(segment tokens / window * barWidth)`, and the unused remainder is all appended as a trailing `free` segment (unless `free` is in `exclude`), so the three segments sum to exactly the bar width.
-- The composition bar's `cached`, `prompt`, `think` and `out` are allocated by `round(segment tokens / used * barWidth)`, and no `free` tail is appended on purpose, so the four segments may sum to 0 to 2 cells less than the bar width.
-- A visual floor applies to both bars: a segment with `token > 0` that rounds to less than `1` cell is topped up to `1` cell so it never silently disappears from the bar. The floor is paid from the unallocated remainder first; if there is not enough, it borrows one cell from the currently widest segment; if neither can spare a cell, that segment stays hidden.
-- Only segments whose token count is `> 0` enter a bar. Both legend rows list every segment that is not excluded, so a segment with no tokens still appears there with a count of `0`.
+`reserved` is a display calculation from the model's output limit. It does not reserve tokens in OpenCode, predict the next response, or represent its auto-compaction threshold. Counts depend on the usage data reported by OpenCode and the provider; the plugin does not tokenize message text. It does not aggregate other turns, subagents, tools, or message roles, and it adds no commands or custom tools.
 
-## Compatibility
+<details>
+<summary>Bar rounding and refresh behavior</summary>
 
-- The measured `opencode` version: `1.18.31`; `package.json`'s engines requirement for it is `>=1.18.0`.
-- The `@opentui/solid` version this project resolved in practice: `0.4.5`; `package.json`'s peer requirement for it is `>=0.4.5`.
-- The host rewrites this plugin's imports of `@opentui/solid` and `solid-js` to its own bundled modules. In other words, the plugin's `devDependencies` versions only affect the shape of the build output, not runtime module resolution; at runtime the host's own copy is used.
-- The plugin has no runtime dependencies (its `dependencies` is empty); its output references only host-provided modules and Node built-ins.
+Each segment receives a rounded share of the available character cells, capped by the remaining width. A positive segment that rounds to zero receives a one-cell minimum when space can be taken from the remainder or a wider segment. The overview fills its remaining cells with `free` unless excluded; the composition leaves rounding gaps unfilled. Cell widths are therefore approximate, especially for tiny segments.
 
-## Coexistence with other plugins
+The plugin listens to `message.updated`, `message.part.updated`, `session.updated`, and `session.idle`. A 50 ms leading-edge throttle drops events inside that interval; there is no polling or trailing refresh timer. Subscriptions are removed when the plugin is disposed. A new response may keep showing the previous snapshot until it reports output tokens.
 
-`sidebar_content` is a shared slot provided by the host, and multiple plugins can register content into the same slot at the same time. This plugin registers that slot at `order: 60`. The `order` value is defined in the plugin's implementation, not in `tui.json`.
+</details>
 
-If another plugin also writes a context panel into `sidebar_content`, enabling both at once puts two overlapping panels in the sidebar. Keep just one of them: remove the one you don't need from the `plugin` array in `tui.json`.
+## Troubleshooting
 
-The host's built-in context panel registers the same slot. If you don't want it to overlap this plugin, set `"internal:sidebar-context"` to `false` in `tui.json`'s `plugin_enabled`. This plugin has no entry in `plugin_enabled`, so it stays enabled.
+| Symptom | What to check |
+| --- | --- |
+| Installation command is unavailable | Check `opencode plugin --help`; the native install flow is documented here for `1.18.31`. Upgrade OpenCode or use a local installation. |
+| npm cannot find the package | Check the package name, requested version, and registry access. If npm is unavailable, use the prebuilt ZIP. |
+| No panel appears | Check the OpenCode version, the visible sidebar, the `tui.json` entry, and the plugin manager's enable state. For local installations, also check the `package.json` + `dist/tui.js` layout. Restart OpenCode after changes. |
+| `no assistant turns yet` | No assistant message has reported positive output tokens yet. An existing message with zero output does not qualify. |
+| Tokens appear but the overview is empty / `0% used` | The plugin could not find a positive context limit for the model that produced the measured message. Check that model's provider metadata. |
+| Counts or percentage disappear in a narrow sidebar | The responsive layout hides details that do not fit. Widen the terminal/sidebar; `barWidth` does not override the measured width. |
+| Two context panels appear | Disable the built-in `internal:sidebar-context` panel or another plugin providing the same information. Check the plugin manager's saved state if `plugin_enabled` seems ineffective. |
+| Values do not match a billing total or the next prompt | This is one reported assistant snapshot. It is not a sum across turns, a billing calculator, or a tokenizer. |
 
-## Disable and uninstall
+Still having trouble? [Open an issue](https://github.com/SolitudeRA/opencode-tui-context/issues) with your OpenCode version, OS/terminal, plugin options, and a minimal reproduction. Include a redacted screenshot if the problem is visual.
 
-To disable it temporarily and keep the files for re-enabling later: open `~/.config/opencode/tui.json` and remove the `~/.config/opencode/local-plugins/opencode-tui-context` entry from the `plugin` array. If you want the host's built-in context panel back, set `"internal:sidebar-context"` to `true` in `plugin_enabled`.
+## Update or remove
 
-To uninstall completely: first disable it as above, then delete the local directory:
+**npm:** replace `<version>` with a released version and run:
 
-```
-rm -rf ~/.config/opencode/local-plugins/opencode-tui-context
-```
-
-When editing `tui.json`, it's best to front it with a backup and record the hash:
-
-```
-B=/tmp/tui.json.before-$(date +%s%N)
-cp ~/.config/opencode/tui.json "$B"
-sha256sum "$B"
+```sh
+opencode plugin -g "opencode-tui-context@<version>" --force
 ```
 
-To restore, copy the backup back and verify the hash matches the backup:
+Omit `-g` for a project installation. On OpenCode `1.18.31`, `--force` replaces the configured package version while preserving tuple options. An explicit version stays pinned; a bare package name follows `latest`. Restart OpenCode after updating. See the host's [update behavior](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install).
 
-```
-cp /tmp/tui.json.before-<timestamp> ~/.config/opencode/tui.json
-sha256sum ~/.config/opencode/tui.json
+**ZIP:** download a newer prebuilt asset and replace the installed directory, keeping the same path in `tui.json`. **Source:** in an unmodified checkout, run `git pull --ff-only`, then repeat the build and copy steps. Restart OpenCode.
+
+To stop loading the plugin, remove its entry from `tui.json`'s `plugin` array and restart. For local installations, you can then delete the copied `local-plugins/opencode-tui-context` directory. OpenCode `1.18.31` has no plugin uninstall command; removing the config entry does not clear its npm cache. If you disabled the built-in context panel, re-enable it through `plugin_enabled` or the plugin manager.
+
+## Development
+
+Use Git, Bun, and Node.js for development. After cloning the repository:
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun test
+bun run build
 ```
 
-`tui.json` is read only once when opencode starts and is not hot-reloaded, so `opencode` has to be restarted before the change takes effect.
+To prepare the npm tarball, prebuilt ZIP, and checksums locally:
+
+```sh
+npm run release:pack
+```
+
+Artifacts are written to `release/`; this command does not publish them. See the [release guide](docs/releasing.md) for the initial npm setup, automated publication, and host installation checks.
+
+Tests cover option normalization, usage arithmetic, bar allocation, colors, legends, and narrow-width behavior. They do not replace a smoke test inside OpenCode: after UI changes, check an empty session, a response with token data, a narrow sidebar, and plugin coexistence.
+
+| File | Responsibility |
+| --- | --- |
+| [`src/tui.tsx`](src/tui.tsx) | Plugin module and ID (`opencode-tui-context`) |
+| [`src/plugin.tsx`](src/plugin.tsx) | Event subscriptions and `sidebar_content` registration at order `60` |
+| [`src/panel.tsx`](src/panel.tsx) | Theme colors, model lookup, and responsive rendering |
+| [`src/usage.ts`](src/usage.ts) | Message selection and usage calculation |
+| [`src/format.ts`](src/format.ts) | Compact counts and character-cell allocation |
+| [`src/options.ts`](src/options.ts) | Configuration defaults and validation |
+| [`scripts/build.mjs`](scripts/build.mjs) | ESM bundle generation with esbuild |
+| [`scripts/release.mjs`](scripts/release.mjs) | Build and validate the npm tarball, prebuilt ZIP, and SHA-256 checksums |
+
+The bundle leaves OpenTUI and Solid imports external for the host to provide. The manifest declares optional peer dependencies and no runtime `dependencies`; copying development dependencies into the installed plugin is unnecessary.
+
+Contributions are welcome. Keep changes focused, run the checks above, and describe the user-visible behavior and validation in your pull request. For behavior changes, update the relevant tests and keep the [English](README.md), [Chinese](README.zh-CN.md), and [Japanese](README.ja.md) guides aligned. Discuss larger scope changes in an issue first.
 
 ## License
 
-Released under the MIT License; see [LICENSE](LICENSE) for the full terms.
+[MIT](LICENSE) © opencode-tui-context contributors.

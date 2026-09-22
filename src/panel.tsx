@@ -22,9 +22,10 @@ export function setPanelWidth(width: number): void {
   setPanelWidthSignal(width)
 }
 
-/** Bar cells available inside the frame: 1 border + 1 padding column on each side. */
+/** Bar cells available inside the frame: 1 border + 1 padding column on each side. Clamped at
+ *  zero, never raised: a floor above the real content width would push rows past the frame. */
 export function effectiveWidth(): number {
-  return Math.max(8, panelWidth() - 2 - 2)
+  return Math.max(0, panelWidth() - 4)
 }
 
 /** Adopts the mounted box's measured width; non-finite and non-positive measurements are ignored. */
@@ -145,6 +146,65 @@ export function compositionLegendItems(usage: Usage, config: ResolvedOptions) {
   }))
 }
 
+const TITLE_LABEL = "Context"
+
+/** What the title row renders: the bold label with the percentage, the label alone, or nothing. */
+export type TitleRung = "both" | "label" | "none"
+
+/** Picks the title-row rung from the content width and the rendered percentage text; the
+ *  percentage is dropped before the label, so no text run is ever cut in half. */
+export function titleRung(eff: number, percentText: string): TitleRung {
+  if (eff < TITLE_LABEL.length) return "none"
+  return eff >= TITLE_LABEL.length + percentText.length ? "both" : "label"
+}
+
+/** A legend item with its colours resolved, ready to render. */
+type LegendCell = { letter: string; label: string; marker: string; color: ThemeColor }
+
+/** How a legend row degrades: counts on one line, counts stacked, marker and letter only, or none. */
+export type LegendRung = "full" | "stacked" | "markers" | "omit"
+
+/** Picks the legend-row rung for the complete labels and the content width, cheapest first. Cell
+ *  budgets, with `n` items and `gaps = n - 1`: `full` = one line with counts; `stacked` = marker
+ *  row plus a count row, each item as wide as its count; `markers` = marker and letter only;
+ *  `omit` = no row. `stacked` is what lets a mid-width panel keep every count. */
+export function legendRung(labels: readonly string[], eff: number): LegendRung {
+  if (labels.length === 0) return "omit"
+  const gaps = labels.length - 1
+  const full = labels.reduce((cells, label) => cells + 4 + label.length, 0) + gaps
+  if (full <= eff) return "full"
+  const stacked = labels.reduce((cells, label) => cells + Math.max(3, label.length), 0) + gaps
+  if (stacked <= eff) return "stacked"
+  const markers = 3 * labels.length + gaps
+  return markers <= eff ? "markers" : "omit"
+}
+
+/** Renders one legend row at the rung its width allows; `null` omits the row. */
+function legendRow(cells: readonly LegendCell[], eff: number, muted: ThemeColor) {
+  const rung = legendRung(
+    cells.map((cell) => cell.label),
+    eff,
+  )
+  if (rung === "omit") return null
+  return (
+    <box flexDirection="row" gap={1}>
+      {cells.map((cell) =>
+        rung === "stacked" ? (
+          <box flexDirection="column" width={Math.max(3, cell.label.length)}>
+            <text fg={cell.color}>{`${cell.marker} ${cell.letter}`}</text>
+            <text fg={muted}>{cell.label}</text>
+          </box>
+        ) : (
+          <box flexDirection="row" gap={1}>
+            <text fg={cell.color}>{`${cell.marker} ${cell.letter}`}</text>
+            {rung === "full" ? <text fg={muted}>{cell.label}</text> : null}
+          </box>
+        ),
+      )}
+    </box>
+  )
+}
+
 /** Builds the panel element tree for one usage snapshot. Deliberately a plain function: the slot body
  *  calls it directly, so every slot re-run rebuilds the tree and re-reads the session data. */
 export function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptions) {
@@ -152,6 +212,9 @@ export function renderPanel(api: TuiPluginApi, sessionId: string, config: Resolv
   const messages = api.state.session.messages(sessionId)
   const assistant = lastAssistantWithTokens(messages)
   const usage = assistant === undefined ? undefined : sessionUsage(api, assistant, config)
+  const eff = effectiveWidth()
+  const percentText = usage === undefined ? undefined : `${formatPercent(usage.percent)} used`
+  const title = titleRung(eff, percentText ?? "")
   return (
     <box
       flexDirection="column"
@@ -168,51 +231,55 @@ export function renderPanel(api: TuiPluginApi, sessionId: string, config: Resolv
       }}
     >
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={theme.text}>
-          <b>Context</b>
-        </text>
-        {usage === undefined ? null : (
-          <text fg={theme[overviewToken("used")]}>{`${formatPercent(usage.percent)} used`}</text>
+        {title === "none" ? null : (
+          <text fg={theme.text}>
+            <b>{TITLE_LABEL}</b>
+          </text>
         )}
+        {title === "both" && percentText !== undefined ? (
+          <text fg={theme[overviewToken("used")]}>{percentText}</text>
+        ) : null}
       </box>
       {usage === undefined ? (
         <text fg={theme.textMuted}>no assistant turns yet</text>
       ) : (
         <box flexDirection="column" gap={1}>
           <box flexDirection="row">
-            {overviewBarEntries(usage, config, effectiveWidth()).map((entry) => (
+            {overviewBarEntries(usage, config, eff).map((entry) => (
               <text fg={theme[overviewToken(entry.id)]}>
                 {(entry.id === "free" ? BAR_EMPTY : BAR_FILLED).repeat(entry.cells)}
               </text>
             ))}
           </box>
           <box flexDirection="row">
-            {compositionBarEntries(usage, config, effectiveWidth()).map((entry) => (
+            {compositionBarEntries(usage, config, eff).map((entry) => (
               <text fg={segmentColor(entry.id, theme)}>{BAR_FILLED.repeat(entry.cells)}</text>
             ))}
           </box>
-          {config.showLegend ? (
-            <box flexDirection="row" gap={1}>
-              {overviewLegendItems(usage, config).map((item) => (
-                <box flexDirection="row" gap={1}>
-                  <text fg={theme[overviewToken(item.id)]}>
-                    {`${item.id === "free" ? BAR_EMPTY : BAR_FILLED} ${item.letter}`}
-                  </text>
-                  <text fg={theme.textMuted}>{item.label}</text>
-                </box>
-              ))}
-            </box>
-          ) : null}
-          {config.showLegend ? (
-            <box flexDirection="row" gap={1}>
-              {compositionLegendItems(usage, config).map((item) => (
-                <box flexDirection="row" gap={1}>
-                  <text fg={segmentColor(item.id, theme)}>{`${BAR_FILLED} ${item.letter}`}</text>
-                  <text fg={theme.textMuted}>{item.label}</text>
-                </box>
-              ))}
-            </box>
-          ) : null}
+          {config.showLegend
+            ? legendRow(
+                overviewLegendItems(usage, config).map((item) => ({
+                  letter: item.letter,
+                  label: item.label,
+                  marker: item.id === "free" ? BAR_EMPTY : BAR_FILLED,
+                  color: theme[overviewToken(item.id)],
+                })),
+                eff,
+                theme.textMuted,
+              )
+            : null}
+          {config.showLegend
+            ? legendRow(
+                compositionLegendItems(usage, config).map((item) => ({
+                  letter: item.letter,
+                  label: item.label,
+                  marker: BAR_FILLED,
+                  color: segmentColor(item.id, theme),
+                })),
+                eff,
+                theme.textMuted,
+              )
+            : null}
         </box>
       )}
     </box>

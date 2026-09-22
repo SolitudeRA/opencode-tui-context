@@ -6,11 +6,11 @@
   "description": "OpenCode TUI plugin that renders session context-window usage as a segmented bar in the sidebar",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/owner/opencode-tui-context.git"
+    "url": "git+https://github.com/SolitudeRA/opencode-tui-context.git"
   },
-  "homepage": "https://github.com/owner/opencode-tui-context#readme",
+  "homepage": "https://github.com/SolitudeRA/opencode-tui-context#readme",
   "bugs": {
-    "url": "https://github.com/owner/opencode-tui-context/issues"
+    "url": "https://github.com/SolitudeRA/opencode-tui-context/issues"
   },
   "keywords": [
     "opencode",
@@ -20,7 +20,7 @@
     "context-window",
     "tokens"
   ],
-  "author": "owner",
+  "author": "SolitudeRA",
   "exports": {
     "./tui": {
       "import": "./dist/tui.js"

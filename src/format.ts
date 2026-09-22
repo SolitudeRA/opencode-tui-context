@@ -1,12 +1,8 @@
 import type { OverviewSegmentId, Segment, SegmentId } from "./types"
 
-// Baseline formatters (tui.js:181-183): plain integer and compact number formats.
-const tokenFmt = new Intl.NumberFormat("en-US")
+// Compact number format for token counts, mirroring the abbreviated counts shown by the built-in
+// sidebar panel shipped with opencode.
 const compactFmt = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 })
-
-export function formatTokens(n: number): string {
-  return tokenFmt.format(n)
-}
 
 export function formatCompact(n: number): string {
   return compactFmt.format(n)
@@ -22,9 +18,10 @@ type CellPlan<T extends string> = { id: T; tokens: number; natural: number; cell
 const COMPOSITION_IDS: readonly SegmentId[] = ["cached", "prompt", "think", "out"]
 
 /**
- * Distributes `width` cells across `entries` in order, mirroring the baseline `segmentBar`
- * (tui.js:132-144): each entry takes `round(tokens / denominator * width)` cells, capped by what is
- * left. Callers pre-filter their entries.
+ * Distributes `width` cells across `entries` in order, mirroring the segment bar drawn by the
+ * built-in sidebar panel shipped with opencode: each entry takes
+ * `round(tokens / denominator * width)` cells, capped by what is left. Callers pre-filter their
+ * entries.
  *
  * Visual floor: a positive entry that rounds to zero cells still receives one cell so it never
  * silently drops out of the bar (and therefore the legend). A floor is paid from the remaining cells
@@ -68,28 +65,6 @@ export function allocateCells<T extends string>(
     cells: planned.filter((entry) => entry.cells > 0).map((entry) => ({ id: entry.id, cells: entry.cells })),
     remaining,
   }
-}
-
-/**
- * Allocates bar cells per segment: non-free segments with positive finite tokens are passed to
- * `allocateCells`, and the leftover cells become a trailing `free` segment unless `free` is excluded.
- */
-export function formatBar(
-  segments: readonly Segment[],
-  window: number,
-  width: number,
-  exclude: readonly SegmentId[] = [],
-): Array<{ id: SegmentId; cells: number }> {
-  if (width <= 0 || window <= 0) return []
-  const filtered: Array<{ id: SegmentId; tokens: number }> = []
-  for (const segment of segments) {
-    if (segment.id === "free") continue
-    if (!Number.isFinite(segment.tokens) || segment.tokens <= 0) continue
-    filtered.push({ id: segment.id, tokens: segment.tokens })
-  }
-  const { cells, remaining } = allocateCells(filtered, window, width)
-  if (remaining > 0 && !exclude.includes("free")) cells.push({ id: "free", cells: remaining })
-  return cells
 }
 
 /**

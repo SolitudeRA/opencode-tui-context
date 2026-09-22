@@ -4,13 +4,17 @@ import {
   compositionBarEntries,
   compositionLegendItems,
   effectiveWidth,
+  legendRung,
   overviewBarEntries,
   overviewLegendItems,
   overviewToken,
   segmentColor,
   setPanelWidth,
+  titleRung,
+  type LegendRung,
   type ResolvedOptions,
   type Theme,
+  type TitleRung,
 } from "./panel"
 import type { Usage } from "./types"
 
@@ -210,13 +214,92 @@ describe("panel width", () => {
     expect(effectiveWidth()).toBe(20)
   })
 
-  test("clamps a narrow panel up to the eight-column floor", () => {
+  test("subtracts the four frame columns from an eight-column panel", () => {
     setPanelWidth(8)
-    expect(effectiveWidth()).toBe(8)
+    expect(effectiveWidth()).toBe(4)
   })
 
   test("tracks a wide 200-column panel", () => {
     setPanelWidth(200)
     expect(effectiveWidth()).toBe(196)
   })
+})
+
+// `TITLE_LABEL` is the 7-character literal `Context`, so the title ladder is: below 7 columns no
+// title; 7 through 7 + percent length - 1 the label alone; 7 + percent length and above the label
+// with the percentage. Every width below is written out by hand from those literals; no expectation
+// calls `titleRung` to compute itself.
+describe("titleRung", () => {
+  test("omits the title one column below the seven-character label", () =>
+    expect<TitleRung>(titleRung(6, "87% used")).toBe("none"))
+
+  test("omits the title at a zero content width", () =>
+    expect<TitleRung>(titleRung(0, "87% used")).toBe("none"))
+
+  test("draws the label alone when it exactly fills the content width", () =>
+    expect<TitleRung>(titleRung(7, "87% used")).toBe("label"))
+
+  test("draws the label alone with an 8-character percent one column short of both", () =>
+    expect<TitleRung>(titleRung(14, "87% used")).toBe("label"))
+
+  test("draws label and 8-character percent at exactly 7 + 8 columns", () =>
+    expect<TitleRung>(titleRung(15, "87% used")).toBe("both"))
+
+  test("draws the label alone with a 9-character percent at the width that fits 87% used", () =>
+    expect<TitleRung>(titleRung(15, "100% used")).toBe("label"))
+
+  test("draws label and 9-character percent at exactly 7 + 9 columns", () =>
+    expect<TitleRung>(titleRung(16, "100% used")).toBe("both"))
+})
+
+// By hand, with `n` labels and `gaps = n - 1` single-column gaps between them: each full entry costs
+// 4 + label length cells (marker, space, letter, space, label), each stacked column costs
+// max(3, label length), and each marker entry costs 3. The overview labels ["20.2K", "7K", "172.8K"]
+// are 5, 2 and 6 characters: full = (4+5) + (4+2) + (4+6) + 2 = 27, stacked = max(3,5) + max(3,2) +
+// max(3,6) + 2 = 16, markers = 3 * 3 + 2 = 11. The composition labels ["5.4K", "12.9K", "700",
+// "1.2K"] are 4, 5, 3 and 4 characters: full = (4+4) + (4+5) + (4+3) + (4+4) + 3 = 35, stacked =
+// 4 + 5 + 3 + 4 + 3 = 19, markers = 3 * 4 + 3 = 15. Each expectation below sits on one side of one
+// of those three literal budgets; no expectation calls `legendRung` to compute itself.
+describe("legendRung", () => {
+  test("keeps every overview count on one line at the exact 27-column full budget", () =>
+    expect<LegendRung>(legendRung(["20.2K", "7K", "172.8K"], 27)).toBe("full"))
+
+  test("stacks the overview counts one column under the 27-column full budget", () =>
+    expect<LegendRung>(legendRung(["20.2K", "7K", "172.8K"], 26)).toBe("stacked"))
+
+  test("still stacks the overview counts at the exact 16-column stacked budget", () =>
+    expect<LegendRung>(legendRung(["20.2K", "7K", "172.8K"], 16)).toBe("stacked"))
+
+  test("drops the overview counts one column under the 16-column stacked budget", () =>
+    expect<LegendRung>(legendRung(["20.2K", "7K", "172.8K"], 15)).toBe("markers"))
+
+  test("still draws overview markers and letters at the exact 11-column markers budget", () =>
+    expect<LegendRung>(legendRung(["20.2K", "7K", "172.8K"], 11)).toBe("markers"))
+
+  test("omits the overview legend one column under the 11-column markers budget", () =>
+    expect<LegendRung>(legendRung(["20.2K", "7K", "172.8K"], 10)).toBe("omit"))
+
+  test("keeps every composition count on one line at the exact 35-column full budget", () =>
+    expect<LegendRung>(legendRung(["5.4K", "12.9K", "700", "1.2K"], 35)).toBe("full"))
+
+  test("stacks the composition counts one column under the 35-column full budget", () =>
+    expect<LegendRung>(legendRung(["5.4K", "12.9K", "700", "1.2K"], 34)).toBe("stacked"))
+
+  test("still stacks the composition counts at the exact 19-column stacked budget", () =>
+    expect<LegendRung>(legendRung(["5.4K", "12.9K", "700", "1.2K"], 19)).toBe("stacked"))
+
+  test("drops the composition counts one column under the 19-column stacked budget", () =>
+    expect<LegendRung>(legendRung(["5.4K", "12.9K", "700", "1.2K"], 18)).toBe("markers"))
+
+  test("still draws composition markers and letters at the exact 15-column markers budget", () =>
+    expect<LegendRung>(legendRung(["5.4K", "12.9K", "700", "1.2K"], 15)).toBe("markers"))
+
+  test("omits the composition legend one column under the 15-column markers budget", () =>
+    expect<LegendRung>(legendRung(["5.4K", "12.9K", "700", "1.2K"], 14)).toBe("omit"))
+
+  test("omits an empty legend at any width", () =>
+    expect<LegendRung>(legendRung([], 200)).toBe("omit"))
+
+  test("omits a populated legend at a zero content width", () =>
+    expect<LegendRung>(legendRung(["20.2K", "7K", "172.8K"], 0)).toBe("omit"))
 })

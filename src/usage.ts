@@ -1,3 +1,4 @@
+import { asRecord } from "./guards"
 import type { Segment, SegmentId, TokenCounts, Usage, UsageLimits } from "./types"
 
 export type AssistantUsage = {
@@ -6,16 +7,7 @@ export type AssistantUsage = {
   modelID?: string
 }
 
-/** Mirrors the baseline `record()` helper: only plain objects are usable as records. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {}
-}
-
-/** Mirrors the baseline `num()` helper: non-finite and non-positive values collapse to zero. */
+/** Non-finite and non-positive values collapse to zero. */
 function count(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : 0
 }
@@ -40,7 +32,7 @@ export function lastAssistantWithTokens(messages: readonly unknown[]): Assistant
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = asRecord(messages[index])
     if (message.role !== "assistant") continue
-    // Baseline tui.js:277 selects on `(m.tokens?.output ?? 0) > 0` — output tokens only, never the total.
+    // A message qualifies only when its own output tokens are greater than zero, never the total.
     const output = asRecord(message.tokens).output ?? 0
     const carriesOutput = typeof output === "number" && output > 0
     if (!carriesOutput) continue
@@ -67,7 +59,7 @@ export function computeUsage(input: {
   const free = window > 0 ? Math.max(0, window - used - reserved) : 0
   const prompt = inputTokens + cacheWrite
   const exclude = input.exclude ?? []
-  // Segment order is fixed by the baseline (tui.js:42-49); filtering happens here (tui.js:54).
+  // Segment order is fixed; filtering happens here.
   const candidates: Segment[] = [
     { id: "cached", tokens: cacheRead },
     { id: "prompt", tokens: prompt },

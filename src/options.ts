@@ -1,17 +1,9 @@
+import { asRecord } from "./guards"
 import type { PluginOptions_, SegmentId } from "./types"
 
 const DEFAULT_BAR_WIDTH = 24
 const MIN_BAR_WIDTH = 8
 const MAX_BAR_WIDTH = 120
-
-/** Mirrors the baseline `record()` helper: only plain objects are usable as option bags. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {}
-}
 
 const SEGMENT_IDS: readonly SegmentId[] = ["cached", "prompt", "think", "out", "reserved", "free"]
 

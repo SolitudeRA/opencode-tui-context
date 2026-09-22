@@ -49,7 +49,7 @@ OpenCode の TUI サイドバーに、現在のセッションのコンテキス
 前提：`opencode` が使えること、バージョンが「互換性」の節の要件を満たすこと。このプラグインはソースからビルドしたものをローカルディレクトリとして読み込む方式で、パッケージマネージャは経由しません。
 
 ```
-git clone https://github.com/owner/opencode-tui-context.git
+git clone https://github.com/SolitudeRA/opencode-tui-context.git
 cd opencode-tui-context
 bun install
 bun run build
@@ -71,7 +71,6 @@ cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 
 GitHub Release にビルド済みの `tui.js` が添付されている場合は、それをダウンロードしてコピー先に置けば、`bun install` と `bun run build` の 2 手順を省略できます。
 
-コマンド内の `owner` は GitHub アカウントのプレースホルダです。正式リリース前に実際のアカウントへ置き換える必要があり、置き換え箇所は `package.json` と 3 つの README です。
 
 ## 設定
 
@@ -116,7 +115,7 @@ percent  = min(100, round(used / window * 100))
 - `reserved` は `limit.output > 0` のときだけ計算し、それ以外は `0` です。
 - 全体バーの `used` と `reserved` は `round(セグメント token / window * barWidth)` で配分し、埋まらなかった余りはすべて末尾の `free` セグメントに足します（`free` が `exclude` にある場合を除く）。3 セグメントの合計はちょうどバー幅になります。
 - 構成バーの `cached`、`prompt`、`think`、`out` は `round(セグメント token / used * barWidth)` で配分し、`free` の末尾は意図的に足しません。4 セグメントの合計はバー幅より 0 から 2 セル少なくなることがあります。
-- 視覚的な下限は 2 本のバーの両方に効きます。`token > 0` のセグメントが四捨五入で `1` セル未満になる場合、`1` セルに引き上げ、セグメントがバーとレジェンドから消えるのを防ぎます。セルを補うときはまず未配分の余りから引き、余りが足りなければ現在最も幅の広いセグメントから 1 セル借ります。どちらからもセルを出せない場合、そのセグメントは表示されません。
+- 視覚的な下限は 2 本のバーの両方に効きます。`token > 0` のセグメントが四捨五入で `1` セル未満になる場合、`1` セルに引き上げ、セグメントがバーから消えるのを防ぎます。セルを補うときはまず未配分の余りから引き、余りが足りなければ現在最も幅の広いセグメントから 1 セル借ります。どちらからもセルを出せない場合、そのセグメントは表示されません。
 - token 数が `> 0` のセグメントだけがバーに入ります。両方のレジェンド行は除外されていないセグメントをすべて並べるため、token 数が `0` のセグメントも `0` という表示でレジェンドに現れます。
 
 ## 互換性

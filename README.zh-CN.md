@@ -49,7 +49,7 @@
 前提：`opencode` 可用，版本满足「兼容性」一节的要求。本插件从源码构建后以本地目录形式加载，不经过任何包管理器。
 
 ```
-git clone https://github.com/owner/opencode-tui-context.git
+git clone https://github.com/SolitudeRA/opencode-tui-context.git
 cd opencode-tui-context
 bun install
 bun run build
@@ -71,7 +71,6 @@ cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 
 若维护者在 GitHub Release 上附带了构建好的 `tui.js`，可以直接下载后放进目标目录，跳过 `bun install` 与 `bun run build` 两步。
 
-命令里的 `owner` 是 GitHub 账号占位符。正式发布前要把它替换成真实账号，替换点包括 `package.json` 与三份 README。
 
 ## 配置
 
@@ -116,7 +115,7 @@ percent  = min(100, round(used / window * 100))
 - `reserved` 只在 `limit.output > 0` 时计算，否则为 `0`。
 - 总览条的 `used` 与 `reserved` 按 `round(段 token / window * barWidth)` 分配，未占满的余量全部补成末尾的 `free` 段（除非 `free` 在 `exclude` 里），三段之和恰好等于条宽。
 - 构成条的 `cached`、`prompt`、`think`、`out` 按 `round(段 token / used * barWidth)` 分配，刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格。
-- 视觉保底对两条条都生效：一个 `token > 0` 的段若四舍五入后不足 `1` 格，会被补足为 `1` 格，避免整段从条与图例里消失。补格时先扣未分配的余量，余量不足则从当前最宽的段借一格；若两者都腾不出格子，该段仍不显示。
+- 视觉保底对两条条都生效：一个 `token > 0` 的段若四舍五入后不足 `1` 格，会被补足为 `1` 格，避免整段从条里消失。补格时先扣未分配的余量，余量不足则从当前最宽的段借一格；若两者都腾不出格子，该段仍不显示。
 - 只有 token 数 `> 0` 的段才会进入条。两排图例都会列出所有未被排除的段，因此 token 数为 `0` 的段仍会以计数 `0` 出现在图例里。
 
 ## 兼容性

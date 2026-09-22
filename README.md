@@ -49,7 +49,7 @@ A segment hidden by `exclude` disappears from both its bar and its legend entry,
 Prerequisite: `opencode` must be available, at a version that satisfies the "Compatibility" section. The plugin is built from source and loaded as a local directory; it does not go through any package manager.
 
 ```
-git clone https://github.com/owner/opencode-tui-context.git
+git clone https://github.com/SolitudeRA/opencode-tui-context.git
 cd opencode-tui-context
 bun install
 bun run build
@@ -71,7 +71,6 @@ Next, add the target directory to the `plugin` array in `~/.config/opencode/tui.
 
 If the maintainer attaches a built `tui.js` to a GitHub Release, you can download it into the target directory and skip both the `bun install` and `bun run build` steps.
 
-The `owner` in the commands is a placeholder for a GitHub account. It has to be replaced with the real account before a public release, in `package.json` and in all three READMEs.
 
 ## Configuration
 
@@ -116,7 +115,7 @@ A few notes:
 - `reserved` is computed only when `limit.output > 0`; otherwise it is `0`.
 - The overview bar's `used` and `reserved` are allocated by `round(segment tokens / window * barWidth)`, and the unused remainder is all appended as a trailing `free` segment (unless `free` is in `exclude`), so the three segments sum to exactly the bar width.
 - The composition bar's `cached`, `prompt`, `think` and `out` are allocated by `round(segment tokens / used * barWidth)`, and no `free` tail is appended on purpose, so the four segments may sum to 0 to 2 cells less than the bar width.
-- A visual floor applies to both bars: a segment with `token > 0` that rounds to less than `1` cell is topped up to `1` cell so it never silently disappears from the bar and the legend. The floor is paid from the unallocated remainder first; if there is not enough, it borrows one cell from the currently widest segment; if neither can spare a cell, that segment stays hidden.
+- A visual floor applies to both bars: a segment with `token > 0` that rounds to less than `1` cell is topped up to `1` cell so it never silently disappears from the bar. The floor is paid from the unallocated remainder first; if there is not enough, it borrows one cell from the currently widest segment; if neither can spare a cell, that segment stays hidden.
 - Only segments whose token count is `> 0` enter a bar. Both legend rows list every segment that is not excluded, so a segment with no tokens still appears there with a count of `0`.
 
 ## Compatibility

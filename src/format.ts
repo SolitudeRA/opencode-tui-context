@@ -24,7 +24,7 @@ const COMPOSITION_IDS: readonly SegmentId[] = ["cached", "prompt", "think", "out
  * entries.
  *
  * Visual floor: a positive entry that rounds to zero cells still receives one cell so it never
- * silently drops out of the bar (and therefore the legend). A floor is paid from the remaining cells
+ * silently drops out of the bar. A floor is paid from the remaining cells
  * first, otherwise borrowed from the widest entry; when neither can spare a cell the floor is
  * skipped. The total never exceeds `width`.
  *

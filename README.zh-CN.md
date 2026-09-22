@@ -1,165 +1,274 @@
-[English](README.md) | 简体中文 | [日本語](README.ja.md)
-
 # opencode-tui-context
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+**在 OpenCode 侧边栏，一眼看清上下文占用与 token 构成。**
 
-在 OpenCode 的 TUI 侧边栏里，把当前会话的上下文窗口占用画成两条分段进度条：一条总览条显示 `used` / `reserved` / `free`，一条构成条显示 `cached` / `prompt` / `think` / `out`。插件注册宿主提供的 `sidebar_content` 槽位，读取当前会话最后一条 assistant 消息的 token 统计与模型限额，算出各段占比并渲染。插件 id 为 `opencode-tui-context`。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![OpenCode: >=1.18.0](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.0-18181b)](#环境要求)
 
-## 功能
+[English](README.md) · 简体中文 · [日本語](README.ja.md)
 
-- 在侧边栏渲染两条宽度可配的进度条，上下各占一行：总览条以 `window` 为分母，分成 `used` / `reserved` / `free` 三段；构成条以 `used` 为分母，分成 `cached` / `prompt` / `think` / `out` 四段。
-- 每条进度条下方各配一排字母图例：总览条是 `u` / `r` / `f`，构成条是 `c` / `p` / `t` / `o`。每个条目是一个与条同款的一格色块，色块与字母、字母与该段的紧凑计数之间各空一格。
-- 在面板右上角给出百分比占用；token 总量由总览条那排图例（`u` / `r` / `f` 三项数字）承担，不单列一行。
-- 会话有新消息时自动刷新：订阅 `message.updated`、`message.part.updated`、`session.updated`、`session.idle` 四个事件，重绘做 50ms 前置节流；卸载时清理全部订阅，不用定时轮询。
-- 还没有 assistant 消息时显示 `no assistant turns yet`，不是空白，也不报错。
+用两条紧凑的分段条，显示模型上下文窗口的已用空间、输出预留空间，以及缓存、提示、推理和输出各自占用的 token。
 
-## 范围
+![上下文面板示意：已用 40%，上方显示已用、预留和剩余空间，下方显示缓存、提示、推理和输出 token 的构成。](docs/assets/context-preview.svg)
 
-本项目刻意保持最小范围，以下事情明确不做：面板不做工具级 token 排行，不做 token 趋势图，不拆分或展示子代理用量，不内置 tokenizer（例如 tiktoken），不注册自定义工具，也不提供 `/context` 命令，同样不做 SYSTEM/USER/ASSISTANT 这类角色归因。它只反映「最后一条携带 output token 的 assistant 消息」这一个快照。
+*图中为示例数据与配色；实际颜色随 OpenCode 主题变化，输出段固定为黄色。*
 
-## 显示
+- **两个视角，一份快照**：上方看窗口容量，下方看已用 token 的构成。
+- **适应侧边栏宽度**：进度条自动缩放，空间变窄时图例会堆叠或简化。
+- **随会话更新**：通过事件刷新，无需轮询。
+- **按需精简显示**：可隐藏指定分段或两组图例。
+- **直接读取已有用量**：无需额外模型调用、tokenizer 或凭据。
 
-两条进度条的分段含义与颜色对照如下。
+面板反映的是**最近一条带有输出 token 的 assistant 消息**，不代表整个会话的累计账单，也不是对下一次提示词的精确计数。
 
-| 所属条 | segment id | 含义 | 颜色 token |
-| --- | --- | --- | --- |
-| 总览条 | `used` | input + cacheRead + cacheWrite + reasoning + output | `primary` |
-| 总览条 | `reserved` | `limit.output - output` 的预留量 | `textMuted` |
-| 总览条 | `free` | 窗口剩余 | `text` |
-| 构成条 | `cached` | 缓存命中的输入 token（cache read） | `success` |
-| 构成条 | `prompt` | input + cacheWrite | `accent` |
-| 构成条 | `think` | reasoning | `secondary` |
-| 构成条 | `out` | output | `#ffff00`（硬编码） |
+[快速开始](#快速开始) · [读懂面板](#读懂面板) · [配置](#配置) · [常见问题](#常见问题) · [开发与贡献](#开发与贡献)
 
-除 `out` 外，颜色 token 就是宿主主题里的字段名，取值来自 `api.theme.current.<token>`；`out` 用的是硬编码的 `#ffff00`。
+## 快速开始
 
-`think` 用 `secondary`，这是一种蓝色，色相约 215 度，它与面板里其余每个颜色的色相距离都不小于约 46 度。`out` 用硬编码的 `#ffff00`，即纯黄，色相约 60 度，之所以硬编码，是因为 opencode 的默认主题里没有亮黄色。主题自带的黄都离得太近：`warning`（`#f5a742`，色相约 34 度）和 `markdownEmph`（`#e5c07b`，色相约 39 度）离 `used` 段所用的 `primary`（色相约 24 度）只有 10 到 15 度，两格色块放在一起几乎分不出来，正是这个面板要避免的撞色；而柠檬黄绿的 `diffHighlightAdded`（`#b8db87`，色相约 85 度）偏绿，不够黄。硬编码也有代价：`#ffff00` 不跟随宿主主题，在浅色（light）主题下观感会不合适。面板上一共五个颜色（`u` / `c` / `p` / `t` / `o`），选色时以「任意两色之间的最小色相距离最大」为准。
+### 环境要求
 
-面板最外层有一条 `borderSubtle` 色的边框，左右各留一列内边距。框内自上而下依次是标题行、总览条、构成条、第一排图例、第二排图例。标题行两端由 `space-between` 分列：左侧是 `Context` 标题，右端是占用百分比（形如 `42% used`）。
+- **OpenCode `>=1.18.0`**，与 [package.json](package.json) 的声明一致。开发使用的 SDK 固定为 `1.18.31`；这不表示所有后续宿主版本都经过了实际验证。
+- 以下原生安装命令已按 **OpenCode `1.18.31`** 核对。旧版本请先检查 `opencode plugin --help`，或升级 OpenCode。
+- npm 和预构建 ZIP 安装无需在本地编译。只有源码安装需要 **Git、[Bun](https://bun.sh/) 和 [Node.js](https://nodejs.org/)**。
 
-两条进度条都铺满整行，用点阵字符绘制：每一段按分到的格数重复对应字符并染上该段颜色。总览条以 `window` 为分母，`used` 与 `reserved` 是实心 `▓`（U+2593），`free` 是空心 `░`（U+2591）；未占满的余量全部补成末尾的 `free`，所以三段格数之和恰好等于条宽（除非 `free` 被排除）。构成条以 `used` 为分母，`cached`、`prompt`、`think`、`out` 四段一律实心 `▓`，并且刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格，条右端允许留下这点空隙。
+### npm 安装（发布后推荐）
 
-两排图例只在 `showLegend` 为 `true` 时出现。第一排对应总览条，依次是 `u` / `r` / `f`；第二排对应构成条，依次是 `c` / `p` / `t` / `o`。每个条目由三部分组成，相邻两部分之间空一格：一个与条同款的一格色块，非 `free` 段是实心 `▓`（U+2593），`free` 段是空心 `░`（U+2591）；接着是一个小写字母；最后是该段的紧凑计数（如 `17.4K`）。字母取所属段的颜色，计数统一用 `textMuted`。
+> **首次 npm 发布准备中。** 当前请使用[源码安装](#从源码安装)；下方一行命令在 npm 包发布后可用。
 
-被 `exclude` 排除的段会同时从它所属的条和对应图例条目里消失，字母与计数一并消失。右上角的百分比与总览条的 `used` 段同色（`primary`），不随占用分档变色。两条进度条的总列数都由面板实测宽度决定，会跟随实际可用宽度自适应：面板变宽时两条条一起变长，侧边栏收窄时两条条一起缩短，不会换行；右上角的百分比固定显示，不受条宽影响。
-
-## 安装
-
-前提：`opencode` 可用，版本满足「兼容性」一节的要求。本插件从源码构建后以本地目录形式加载，不经过任何包管理器。
-
+```sh
+opencode plugin -g opencode-tui-context
 ```
+
+OpenCode 会下载预构建包并自动将插件写入全局 `tui.json`，重启后即可加载。只为当前项目安装时，省略 `-g`。也可以在命令面板选择 **Install plugin**，输入 `opencode-tui-context`，并切换到全局范围。详见宿主的[安装说明](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)。
+
+从本地安装迁移时，请移除 `tui.json` 中旧的路径条目，避免重复加载。
+
+### 备用方式：预构建 ZIP
+
+发布附件提供预构建包后，可在 npm 不可用时使用：
+
+1. 打开 [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases)，在 **Assets** 中下载 `opencode-tui-context-<version>.zip`。GitHub 自动生成的 **Source code** 压缩包仍需编译。
+2. 将压缩包中的 `opencode-tui-context` 目录解压到 `tui.json` 同级的 `local-plugins/` 中。默认全局位置是 `~/.config/opencode/local-plugins/`（Windows 为 `$HOME\.config\opencode\local-plugins\`）。保留其中的 `package.json` 和 `dist/tui.js`。
+3. 添加下方的[本地插件配置](#启用本地安装)，然后重启 OpenCode。
+
+如果该版本尚未提供预构建 ZIP 附件，请使用下面的源码安装。
+
+### 从源码安装
+
+<details>
+<summary>构建并复制插件（当前可用）</summary>
+
+需要 Git、Bun 和 Node.js。克隆仓库并构建 `dist/tui.js`：
+
+```sh
 git clone https://github.com/SolitudeRA/opencode-tui-context.git
 cd opencode-tui-context
-bun install
+bun install --frozen-lockfile
 bun run build
-mkdir -p ~/.config/opencode/local-plugins/opencode-tui-context
-cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 ```
 
-最后一步只复制 `dist/` 与 `package.json`，本地方式用不到源码与开发依赖，不必把它们放进目标目录。
+构建产物为 `dist/tui.js`。
 
-接着把目标目录写进 `~/.config/opencode/tui.json` 的 `plugin` 数组：
+在仓库根目录，根据系统将构建产物与清单复制到全局插件目录。
+
+**macOS / Linux**
+
+```sh
+mkdir -p "$HOME/.config/opencode/local-plugins/opencode-tui-context"
+cp -R dist package.json "$HOME/.config/opencode/local-plugins/opencode-tui-context/"
+```
+
+**Windows PowerShell**
+
+```powershell
+$pluginDir = Join-Path $HOME ".config/opencode/local-plugins/opencode-tui-context"
+New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
+Copy-Item -Path dist, package.json -Destination $pluginDir -Recurse -Force
+```
+
+</details>
+
+### 启用本地安装
+
+ZIP 或源码安装完成后，将下面的条目合并到 `~/.config/opencode/tui.json`（Windows 为 `$HOME\.config\opencode\tui.json`），保留已有设置和其他插件：
 
 ```json
 {
-  "plugin": ["~/.config/opencode/local-plugins/opencode-tui-context"]
+  "plugin": ["./local-plugins/opencode-tui-context"]
 }
 ```
 
-`tui.json` 只在 opencode 启动时读取一次，不做热重载，改完要重启 `opencode` 才生效。
+保留下面的目录结构：清单中的 `./tui` 导出指向 `dist/tui.js`。目标目录无需包含源码或 `node_modules`。
 
-若维护者在 GitHub Release 上附带了构建好的 `tui.js`，可以直接下载后放进目标目录，跳过 `bun install` 与 `bun run build` 两步。
+```text
+local-plugins/opencode-tui-context/
+├── package.json
+└── dist/
+    └── tui.js
+```
 
+路径相对于 `tui.json` 所在目录解析。如果使用自定义配置位置，请相应调整复制目录，或使用插件的绝对路径。Windows 的 JSON 路径可以用正斜杠，例如 `D:/Codeing/opencode-tui-context`。不要在 JSON 插件条目中使用 `~/...`，`1.18.31` 的加载器不会展开它。依据见宿主的[配置路径解析](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/config/plugin.ts#L38-L54)和[插件路径识别](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/plugin/shared.ts#L158-L176)。
+
+### 显示面板
+
+配置应写在 **`tui.json`** 中，而不是 `opencode.json` 的服务端插件列表。重启 OpenCode，打开会话并显示侧边栏。assistant 消息报告输出 token 后，**Context** 面板就会显示用量；此前显示 `no assistant turns yet`。
+
+如果希望用本插件替换 OpenCode 内置的上下文面板，再合并以下设置：
+
+```json
+{
+  "plugin_enabled": {
+    "internal:sidebar-context": false
+  }
+}
+```
+
+若两个面板仍同时出现，请检查 OpenCode 插件管理器中保存的启停状态，它可能覆盖配置文件的设置。其他侧边栏插件可以继续启用。启停优先级见宿主的 [TUI 插件说明](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md)。
+
+## 读懂面板
+
+**上方总览条**把模型上下文窗口划分为已用、预留和剩余空间；**下方构成条**只拆分已用 token。两条的分母不同，因此上方仍有大量空闲时，下方也可能已经填满。
+
+| 所属条 | 图例 | 分段 | 含义 |
+| --- | --- | --- | --- |
+| 总览 | `u` | `used` | 输入 + 缓存读取 + 缓存写入 + 推理 + 输出 |
+| 总览 | `r` | `reserved` | 模型输出上限减去已报告的输出量，最低为零 |
+| 总览 | `f` | `free` | 上下文窗口减去已用量和预留量，最低为零 |
+| 构成 | `c` | `cached` | 缓存读取 token |
+| 构成 | `p` | `prompt` | 输入 + 缓存写入 token |
+| 构成 | `t` | `think` | 推理 token |
+| 构成 | `o` | `out` | 输出 token |
+
+标题中的百分比由 `used / window` 四舍五入得到。图例使用 `17.5K` 这样的紧凑计数。实心 `▓` 表示用量或预留量，`░` 表示总览条的剩余空间。
+
+侧边栏变窄时，每组图例会依次将计数移到标记下方、隐藏计数、隐藏整组图例。标题会先隐藏百分比，再隐藏 `Context`。增大侧边栏宽度后，细节会重新显示。
+
+大多数颜色取自宿主主题：`used` → `primary`、`cached` → `success`、`prompt` → `accent`、`think` → `secondary`、`reserved` → `textMuted`、`free` → `text`。输出段固定使用黄色（`#ffff00`），在浅色主题下可能对比度不足。
 
 ## 配置
 
-选项写在 `plugin` 数组的元组第二项，形如 `["<spec>", { ... }]`，`<spec>` 是本地目录路径。
+npm 安装后，在 `tui.json` 中将包名条目改成 `[包名, 选项]` 元组。如果原条目带有 `@版本号` 且希望继续固定该版本，请保留版本后缀：
 
 ```json
 {
   "plugin": [
     [
-      "~/.config/opencode/local-plugins/opencode-tui-context",
-      { "barWidth": 40, "exclude": ["free"], "showLegend": true }
+      "opencode-tui-context",
+      {
+        "barWidth": 24,
+        "exclude": [],
+        "showLegend": true
+      }
     ]
   ]
 }
 ```
 
-| 选项 | 默认值 | 规则与回退 |
-| --- | --- | --- |
-| `barWidth` | `24` | 面板实测宽度出来之前的初始条宽（字符数）。先四舍五入，再夹到 `8-120`。非数字或非有限值（`NaN`、`±Infinity`）回退到 `24`；`0` 会被夹到 `8`，`999` 夹到 `120`。首帧之后条宽由面板实测宽度决定并自动跟随，`barWidth` 只在尚未测量时兜底。 |
-| `exclude` | `[]` | 要从两条进度条和对应图例里隐藏的 segment id 列表。只接受 `cached`、`prompt`、`think`、`out`、`reserved`、`free` 六个值，非法值被丢掉，重复值去重并保留首次出现的顺序。非数组回退到 `[]`。 |
-| `showLegend` | `true` | 是否显示两排字母图例。非布尔值回退到 `true`。设为 `false` 时只隐藏两排图例，两条进度条与右上角百分比保留。 |
+ZIP 或源码安装请将示例中的包名替换为 `"./local-plugins/opencode-tui-context"`。修改已有条目即可，不要重复添加。
 
-所有选项都经过规范化。配置缺省、为 `null`、类型不对，甚至整个选项对象根本不是对象，都不会抛错，一律回退到上表默认值。
+| 选项 | 类型 | 默认值 | 行为 |
+| --- | --- | --- | --- |
+| `barWidth` | `number` | `24` | 实测前的初始**面板外宽**，四舍五入后限制在 `8–120`。进度条会扣除边框和内边距占用的四列。取得测量值后，跟随侧边栏的实际宽度；此选项不能固定进度条宽度。 |
+| `exclude` | `string[]` | `[]` | 隐藏指定分段及其图例。可选值为 `cached`、`prompt`、`think`、`out`、`reserved`、`free`；`used` 不可隐藏。 |
+| `showLegend` | `boolean` | `true` | 空间允许时显示两组图例。设为 `false` 后保留进度条和标题，隐藏图例。 |
 
-## 计算口径
+类型无效的选项回退到默认值；未知或重复的分段 ID 会被忽略。需要更精简的面板时可设 `"showLegend": false`；要隐藏剩余空间尾段，可设 `"exclude": ["free"]`。
 
-设 `input`、`cacheRead`、`cacheWrite`、`reasoning`、`output` 为被测量消息的 token 统计，`limit.context` 与 `limit.output` 为该消息所用模型的上下文与输出限额。各量定义如下：
+排除分段不会改变已用总量或百分比，构成条中剩余的分段也不会重新放大以填满宽度。**如果隐藏 `reserved` 而保留 `free`，预留段的格子会并入视觉上的剩余空间，但剩余 token 计数仍然扣除预留量。**需要对照剩余条宽与数字时，请保留 `reserved`。
 
-```
+修改配置或替换构建产物后，请重启 OpenCode。
+
+## 用量如何计算
+
+插件从当前会话的末尾向前查找，选取最新一条 `tokens.output` 为数值且大于零的 assistant 消息。随后读取它的 token 字段，并根据这条消息自己的 `providerID` / `modelID` 查找模型上限，即使你后来切换了模型也是如此。
+
+```text
 used     = input + cacheRead + cacheWrite + reasoning + output
-window   = limit.context
-reserved = max(0, limit.output - output)
-free     = max(0, window - used - reserved)
 prompt   = input + cacheWrite
-percent  = min(100, round(used / window * 100))
+window   = model.limit.context
+reserved = max(0, model.limit.output - output)
+free     = max(0, window - used - reserved)
+percent  = min(100, round(used / window × 100))
 ```
 
-几点说明：
+缺失或无效的 token 计数按零处理。插件自行加总这些字段，不使用 `tokens.total`。没有有效的正数输出上限时，`reserved` 为零；没有有效的正数上下文上限时，总览条为空，`free` 和显示的百分比均为零，构成条仍可显示 token。**此时 `0% used` 表示容量未知，不表示没有用量。**
 
-- 被测量的对象是会话里最新的一条携带 `tokens.output > 0` 的 assistant 消息。从消息列表尾部往前找，第一条同时满足 `role === "assistant"` 与 `tokens.output > 0` 的消息就是数据源。
-- 当 `window` 为 `0`（模型限额拿不到）时，`free` 与 `percent` 都取 `0`，总览条因为没有分母而整体留空，构成条与两排图例照常渲染。
-- `reserved` 只在 `limit.output > 0` 时计算，否则为 `0`。
-- 总览条的 `used` 与 `reserved` 按 `round(段 token / window * barWidth)` 分配，未占满的余量全部补成末尾的 `free` 段（除非 `free` 在 `exclude` 里），三段之和恰好等于条宽。
-- 构成条的 `cached`、`prompt`、`think`、`out` 按 `round(段 token / used * barWidth)` 分配，刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格。
-- 视觉保底对两条条都生效：一个 `token > 0` 的段若四舍五入后不足 `1` 格，会被补足为 `1` 格，避免整段从条里消失。补格时先扣未分配的余量，余量不足则从当前最宽的段借一格；若两者都腾不出格子，该段仍不显示。
-- 只有 token 数 `> 0` 的段才会进入条。两排图例都会列出所有未被排除的段，因此 token 数为 `0` 的段仍会以计数 `0` 出现在图例里。
+`reserved` 是根据模型输出上限计算出的显示值。它不会在 OpenCode 中实际预留 token，也不预测下一次输出量或表示自动压缩阈值。计数取决于 OpenCode 和提供商报告的用量，插件不会对消息文本重新分词。它不汇总其他轮次、子代理、工具或消息角色的用量，也不新增命令或自定义工具。
 
-## 兼容性
+<details>
+<summary>条形取整与刷新细节</summary>
 
-- 实测的 `opencode` 版本：`1.18.31`；`package.json` 的 engines 对它的要求是 `>=1.18.0`。
-- `@opentui/solid` 在本项目实测解析到的版本：`0.4.5`；`package.json` 对它的 peer 要求是 `>=0.4.5`。
-- 宿主会把本插件对 `@opentui/solid` 与 `solid-js` 的导入重写到宿主自带的模块上。也就是说，插件的 `devDependencies` 版本只影响构建产物的形状，不决定运行时的模块解析；运行时用的是宿主自己的那一份。
-- 本插件没有运行时依赖（`dependencies` 为空），产物只引用宿主提供的模块与 Node 内置模块。
+每个分段按比例获得四舍五入后的字符格数，最多使用当前剩余宽度。如果正数用量被取整为零格，会在剩余空间或较宽分段可让出格子时，补到至少一格。总览条把余下格子填充为 `free`，除非它被排除；构成条不填补取整后的空隙。因此条宽是近似展示，尤其是用量很小的分段。
 
-## 与其它插件共存
+插件监听 `message.updated`、`message.part.updated`、`session.updated` 和 `session.idle`。50 ms 前置节流会丢弃间隔内的事件，没有轮询或尾随刷新定时器；插件释放时解除订阅。新回复尚未报告输出 token 时，面板可能仍然显示上一份快照。
 
-`sidebar_content` 是宿主提供的一个共享槽位，多个插件可以同时往同一个槽位注册内容。本插件以 `order: 60` 注册该槽位。`order` 的值定义在插件实现里，不写在 `tui.json` 中。
+</details>
 
-若另一个插件也往 `sidebar_content` 写上下文面板，两者同时启用时侧边栏会出现两个内容重叠的面板。此时保留其中一个即可：把不需要的那个从 `tui.json` 的 `plugin` 数组里移除。
+## 常见问题
 
-宿主内置的上下文面板同样注册这个槽位。若不想让它与本插件重叠，可在 `tui.json` 的 `plugin_enabled` 里把 `"internal:sidebar-context"` 设为 `false`。本插件在 `plugin_enabled` 里没有条目，因此保持启用。
+| 现象 | 排查方法 |
+| --- | --- |
+| 安装命令不可用 | 先检查 `opencode plugin --help`，本文按 `1.18.31` 的原生安装流程编写。可升级 OpenCode，或使用本地安装。 |
+| npm 找不到包 | 首次 npm 发布仍在准备中，发布前请使用源码安装；发布后请检查目标版本与 registry 访问情况。 |
+| 没有出现面板 | 检查 OpenCode 版本、侧边栏是否显示、`tui.json` 插件条目与插件管理器的启停状态。本地安装还需检查 `package.json` + `dist/tui.js` 目录结构。修改后重启 OpenCode。 |
+| 显示 `no assistant turns yet` | 尚无 assistant 消息报告正数输出 token。已有消息但输出为零，也不会被选中。 |
+| 有 token 数字，但总览条为空 / 显示 `0% used` | 未找到被测消息所用模型的有效上下文上限，请检查该模型的提供商元数据。 |
+| 窄侧栏中计数或百分比消失 | 响应式布局会隐藏放不下的细节。请增大终端或侧边栏宽度，`barWidth` 不会覆盖实际测量值。 |
+| 出现两个上下文面板 | 停用内置的 `internal:sidebar-context` 面板或提供同类信息的其他插件。若 `plugin_enabled` 看似无效，请检查插件管理器保存的状态。 |
+| 数值与账单总量或下一次提示词不一致 | 这里显示单条 assistant 消息报告的快照，不是跨轮次累计、计费工具或 tokenizer。 |
 
-## 停用与卸载
+仍有问题？请[提交 issue](https://github.com/SolitudeRA/opencode-tui-context/issues)，附上 OpenCode 版本、操作系统与终端、插件选项及最小复现步骤。显示问题可以附上已脱敏的截图。
 
-只想暂时停用、保留文件以便日后重新启用：打开 `~/.config/opencode/tui.json`，从 `plugin` 数组里移除 `~/.config/opencode/local-plugins/opencode-tui-context` 这一项即可。如果想把宿主内置的上下文面板请回来，再在 `plugin_enabled` 里把 `"internal:sidebar-context"` 设为 `true`。
+## 更新与移除
 
-彻底卸载：先按上面的步骤停用，再删掉本地目录：
+**npm：**发布后，将 `<version>` 替换为已发布版本并执行：
 
-```
-rm -rf ~/.config/opencode/local-plugins/opencode-tui-context
-```
-
-改 `tui.json` 时最好先做一次备份，记下哈希：
-
-```
-B=/tmp/tui.json.before-$(date +%s%N)
-cp ~/.config/opencode/tui.json "$B"
-sha256sum "$B"
+```sh
+opencode plugin -g "opencode-tui-context@<version>" --force
 ```
 
-需要还原时把备份复制回去，再校验哈希与备份一致：
+项目级安装省略 `-g`。在 OpenCode `1.18.31` 中，`--force` 会替换配置中的包版本，并保留元组里的选项。指定版本后会固定在该版本；仅使用包名则跟随 `latest`。更新后重启 OpenCode。详见宿主的[更新行为说明](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)。
 
-```
-cp /tmp/tui.json.before-<timestamp> ~/.config/opencode/tui.json
-sha256sum ~/.config/opencode/tui.json
+**ZIP：**下载新版预构建附件，替换安装目录，保持 `tui.json` 中路径不变。**源码：**在没有本地改动的检出目录运行 `git pull --ff-only`，重复构建与复制步骤。完成后重启 OpenCode。
+
+停止加载时，从 `tui.json` 的 `plugin` 数组中移除本插件条目并重启。本地安装还可删除复制出的 `local-plugins/opencode-tui-context` 目录。OpenCode `1.18.31` 没有插件卸载命令，移除配置条目不会清除 npm 缓存。若此前停用了内置上下文面板，可通过 `plugin_enabled` 或插件管理器重新启用。
+
+## 开发与贡献
+
+开发需要 Git、Bun 和 Node.js。克隆仓库后运行：
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun test
+bun run build
 ```
 
-`tui.json` 只在 opencode 启动时读取一次，不做热重载，改完要重启 `opencode` 才生效。
+在本地生成 npm 包、预构建 ZIP 和校验文件：
+
+```sh
+npm run release:pack
+```
+
+产物位于 `release/`，此命令不会发布。首次 npm 设置、自动发布与宿主安装验收步骤见[发布指南](docs/releasing.md)。
+
+测试覆盖配置归一化、用量计算、条形格数分配、颜色、图例和窄宽度行为。它们不能替代 OpenCode 内的冒烟测试：修改 UI 后，请检查空会话、有 token 数据的回复、窄侧栏及与其他插件共存的情况。
+
+| 文件 | 职责 |
+| --- | --- |
+| [`src/tui.tsx`](src/tui.tsx) | 插件模块与 ID（`opencode-tui-context`） |
+| [`src/plugin.tsx`](src/plugin.tsx) | 事件订阅，以顺序值 `60` 注册 `sidebar_content` |
+| [`src/panel.tsx`](src/panel.tsx) | 主题配色、模型查找与响应式渲染 |
+| [`src/usage.ts`](src/usage.ts) | 消息选择与用量计算 |
+| [`src/format.ts`](src/format.ts) | 紧凑数字格式与字符格分配 |
+| [`src/options.ts`](src/options.ts) | 配置默认值与校验 |
+| [`scripts/build.mjs`](scripts/build.mjs) | 使用 esbuild 生成 ESM 构建产物 |
+| [`scripts/release.mjs`](scripts/release.mjs) | 构建并验证 npm 包、预构建 ZIP 和 SHA-256 校验文件 |
+
+构建产物将 OpenTUI 和 Solid 的导入保留为外部依赖，由宿主提供。清单声明了可选 peer dependencies，没有运行时 `dependencies`；安装目录无需复制开发依赖。
+
+欢迎贡献。请让改动保持聚焦，运行上面的检查，并在 pull request 中说明用户可见的变化和验证结果。行为发生变化时，请更新相关测试，并保持[英文](README.md)、[中文](README.zh-CN.md)、[日文](README.ja.md)说明一致。较大的范围调整建议先通过 issue 讨论。
 
 ## 许可证
 
-本项目以 MIT 许可证发布，完整条款见 [LICENSE](LICENSE)。
+[MIT](LICENSE) © opencode-tui-context contributors.

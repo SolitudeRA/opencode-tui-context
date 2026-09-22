@@ -31,9 +31,7 @@
 - 以下の標準インストールコマンドは **OpenCode `1.18.31`** に照らして確認しています。古いバージョンでは `opencode plugin --help` を確認するか、OpenCode を更新してください。
 - npm とビルド済み ZIP のインストールにはローカルでのビルドは不要です。ソースからのインストールにのみ **Git、[Bun](https://bun.sh/)、[Node.js](https://nodejs.org/)** が必要です。
 
-### npm からインストール（公開後の推奨方法）
-
-> **初回の npm 公開を準備中です。** 現在は[ソースからのインストール](#ソースからインストール)を利用してください。次の 1 行コマンドは npm パッケージの公開後に利用できます。
+### npm からインストール（推奨）
 
 ```sh
 opencode plugin -g opencode-tui-context
@@ -45,18 +43,16 @@ OpenCode がビルド済みパッケージをダウンロードし、グロー�
 
 ### 代替方法：ビルド済み ZIP
 
-リリースにビルド済みアセットが添付されている場合、npm が利用できない環境ではこちらを使えます。
+リリースにはビルド済み ZIP が含まれています。npm が利用できない環境ではこちらを使えます。
 
 1. [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases) を開き、**Assets** から `opencode-tui-context-<version>.zip` をダウンロードします。GitHub が自動生成する **Source code** アーカイブはビルドが必要です。
 2. アーカイブ内の `opencode-tui-context` ディレクトリを、`tui.json` と同じ場所にある `local-plugins/` に展開します。既定のグローバル設定では `~/.config/opencode/local-plugins/`（Windows は `$HOME\.config\opencode\local-plugins\`）です。`package.json` と `dist/tui.js` をそのまま保ってください。
 3. 下記の[ローカルプラグイン設定](#ローカルインストールを有効にする)を追加し、OpenCode を再起動します。
 
-ビルド済み ZIP が添付されていないリリースでは、下記のソースからのインストールを利用してください。
-
 ### ソースからインストール
 
 <details>
-<summary>プラグインをビルドしてコピーする（現在利用可能）</summary>
+<summary>プラグインをビルドしてコピーする</summary>
 
 Git、Bun、Node.js が必要です。リポジトリをクローンし、`dist/tui.js` をビルドします。
 
@@ -209,7 +205,7 @@ percent  = min(100, round(used / window × 100))
 | 症状 | 確認すること |
 | --- | --- |
 | インストールコマンドが使えない | `opencode plugin --help` を確認してください。本ガイドの標準インストール手順は `1.18.31` に基づきます。OpenCode を更新するか、ローカルインストールを利用してください。 |
-| npm でパッケージが見つからない | 初回の npm 公開を準備中です。公開まではソースからインストールしてください。公開後は指定バージョンとレジストリへの接続を確認してください。 |
+| npm でパッケージが見つからない | パッケージ名、指定バージョン、レジストリへの接続を確認してください。npm が利用できない場合は、ビルド済み ZIP を使えます。 |
 | パネルが表示されない | OpenCode のバージョン、サイドバーの表示状態、`tui.json` のエントリー、プラグインマネージャーの有効状態を確認してください。ローカルインストールでは `package.json` + `dist/tui.js` の配置も確認します。変更後は再起動してください。 |
 | `no assistant turns yet` と表示される | 正の出力トークン数を報告したアシスタントメッセージがまだありません。出力トークン数がゼロのメッセージは対象になりません。 |
 | トークンは表示されるが全体バーが空 / `0% used` になる | 測定対象のメッセージを生成したモデルについて、正のコンテキスト上限を取得できていません。そのモデルのプロバイダーメタデータを確認してください。 |
@@ -221,7 +217,7 @@ percent  = min(100, round(used / window × 100))
 
 ## 更新と削除
 
-**npm：**公開後、`<version>` を公開済みのバージョンに置き換えて実行します。
+**npm：**`<version>` を公開済みのバージョンに置き換えて実行します。
 
 ```sh
 opencode plugin -g "opencode-tui-context@<version>" --force

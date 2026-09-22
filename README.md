@@ -31,9 +31,7 @@ The panel reflects the **latest assistant message with output tokens**, not a cu
 - The native installation commands below were checked against **OpenCode `1.18.31`**. On older versions, check `opencode plugin --help` or upgrade.
 - npm and prebuilt ZIP installations require no local build. Only source installation needs **Git, [Bun](https://bun.sh/), and [Node.js](https://nodejs.org/)**.
 
-### Install from npm (recommended after publication)
-
-> **First npm release in preparation.** For now, use [the source installation](#install-from-source). The one-line command below becomes available after the package is published.
+### Install from npm (recommended)
 
 ```sh
 opencode plugin -g opencode-tui-context
@@ -45,18 +43,16 @@ If migrating from a local installation, remove its old path entry from `tui.json
 
 ### Alternative: prebuilt ZIP
 
-When a release includes prebuilt assets, use this route if npm is unavailable:
+Releases include a prebuilt ZIP for installation when npm is unavailable:
 
 1. Open [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases) and download `opencode-tui-context-<version>.zip` from **Assets**. GitHub's **Source code** archives still require a build.
 2. Extract the included `opencode-tui-context` directory into `local-plugins/` beside your `tui.json`. The default global location is `~/.config/opencode/local-plugins/` (`$HOME\.config\opencode\local-plugins\` on Windows). Keep `package.json` and `dist/tui.js` together.
 3. Add the [local plugin entry](#enable-a-local-installation) below, then restart OpenCode.
 
-If the release has no prebuilt ZIP asset, use the source installation below.
-
 ### Install from source
 
 <details>
-<summary>Build and copy the plugin (currently available)</summary>
+<summary>Build and copy the plugin</summary>
 
 Requires Git, Bun, and Node.js. Clone the repository and build `dist/tui.js`:
 
@@ -209,7 +205,7 @@ The plugin listens to `message.updated`, `message.part.updated`, `session.update
 | Symptom | What to check |
 | --- | --- |
 | Installation command is unavailable | Check `opencode plugin --help`; the native install flow is documented here for `1.18.31`. Upgrade OpenCode or use a local installation. |
-| npm cannot find the package | The first npm release is still being prepared. Use source installation until publication; afterwards, check the requested version and registry access. |
+| npm cannot find the package | Check the package name, requested version, and registry access. If npm is unavailable, use the prebuilt ZIP. |
 | No panel appears | Check the OpenCode version, the visible sidebar, the `tui.json` entry, and the plugin manager's enable state. For local installations, also check the `package.json` + `dist/tui.js` layout. Restart OpenCode after changes. |
 | `no assistant turns yet` | No assistant message has reported positive output tokens yet. An existing message with zero output does not qualify. |
 | Tokens appear but the overview is empty / `0% used` | The plugin could not find a positive context limit for the model that produced the measured message. Check that model's provider metadata. |
@@ -221,7 +217,7 @@ Still having trouble? [Open an issue](https://github.com/SolitudeRA/opencode-tui
 
 ## Update or remove
 
-**npm:** once published, replace `<version>` with a released version and run:
+**npm:** replace `<version>` with a released version and run:
 
 ```sh
 opencode plugin -g "opencode-tui-context@<version>" --force

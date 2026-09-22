@@ -31,9 +31,7 @@
 - 以下原生安装命令已按 **OpenCode `1.18.31`** 核对。旧版本请先检查 `opencode plugin --help`，或升级 OpenCode。
 - npm 和预构建 ZIP 安装无需在本地编译。只有源码安装需要 **Git、[Bun](https://bun.sh/) 和 [Node.js](https://nodejs.org/)**。
 
-### npm 安装（发布后推荐）
-
-> **首次 npm 发布准备中。** 当前请使用[源码安装](#从源码安装)；下方一行命令在 npm 包发布后可用。
+### npm 安装（推荐）
 
 ```sh
 opencode plugin -g opencode-tui-context
@@ -45,18 +43,16 @@ OpenCode 会下载预构建包并自动将插件写入全局 `tui.json`，重启
 
 ### 备用方式：预构建 ZIP
 
-发布附件提供预构建包后，可在 npm 不可用时使用：
+Release 提供预构建 ZIP，可在 npm 不可用时安装：
 
 1. 打开 [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases)，在 **Assets** 中下载 `opencode-tui-context-<version>.zip`。GitHub 自动生成的 **Source code** 压缩包仍需编译。
 2. 将压缩包中的 `opencode-tui-context` 目录解压到 `tui.json` 同级的 `local-plugins/` 中。默认全局位置是 `~/.config/opencode/local-plugins/`（Windows 为 `$HOME\.config\opencode\local-plugins\`）。保留其中的 `package.json` 和 `dist/tui.js`。
 3. 添加下方的[本地插件配置](#启用本地安装)，然后重启 OpenCode。
 
-如果该版本尚未提供预构建 ZIP 附件，请使用下面的源码安装。
-
 ### 从源码安装
 
 <details>
-<summary>构建并复制插件（当前可用）</summary>
+<summary>构建并复制插件</summary>
 
 需要 Git、Bun 和 Node.js。克隆仓库并构建 `dist/tui.js`：
 
@@ -209,7 +205,7 @@ percent  = min(100, round(used / window × 100))
 | 现象 | 排查方法 |
 | --- | --- |
 | 安装命令不可用 | 先检查 `opencode plugin --help`，本文按 `1.18.31` 的原生安装流程编写。可升级 OpenCode，或使用本地安装。 |
-| npm 找不到包 | 首次 npm 发布仍在准备中，发布前请使用源码安装；发布后请检查目标版本与 registry 访问情况。 |
+| npm 找不到包 | 检查包名、目标版本与 registry 访问情况。npm 不可用时，可使用预构建 ZIP。 |
 | 没有出现面板 | 检查 OpenCode 版本、侧边栏是否显示、`tui.json` 插件条目与插件管理器的启停状态。本地安装还需检查 `package.json` + `dist/tui.js` 目录结构。修改后重启 OpenCode。 |
 | 显示 `no assistant turns yet` | 尚无 assistant 消息报告正数输出 token。已有消息但输出为零，也不会被选中。 |
 | 有 token 数字，但总览条为空 / 显示 `0% used` | 未找到被测消息所用模型的有效上下文上限，请检查该模型的提供商元数据。 |
@@ -221,7 +217,7 @@ percent  = min(100, round(used / window × 100))
 
 ## 更新与移除
 
-**npm：**发布后，将 `<version>` 替换为已发布版本并执行：
+**npm：**将 `<version>` 替换为已发布版本并执行：
 
 ```sh
 opencode plugin -g "opencode-tui-context@<version>" --force

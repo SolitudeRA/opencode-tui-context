@@ -1,163 +1,150 @@
+English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
+
 # opencode-tui-context
 
-在 OpenCode 的 TUI 侧边栏里，把当前会话的上下文窗口占用画成两条分段进度条：一条总览条显示 `used` / `reserved` / `free`，一条构成条显示 `cached` / `prompt` / `think` / `out`。插件注册宿主提供的 `sidebar_content` 槽位，读取当前会话最后一条 assistant 消息的 token 统计与模型限额，算出各段占比并渲染。插件 id 为 `opencode-tui-context`。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## 功能
+In OpenCode's TUI sidebar, this plugin draws the current session's context-window usage as two segmented bars: an overview bar showing `used` / `reserved` / `free`, and a composition bar showing `cached` / `prompt` / `think` / `out`. It registers the host-provided `sidebar_content` slot, reads the token counts and model limits of the session's last assistant message, computes each segment's share and renders them. The plugin id is `opencode-tui-context`.
 
-- 在侧边栏渲染两条宽度可配的进度条，上下各占一行：总览条以 `window` 为分母，分成 `used` / `reserved` / `free` 三段；构成条以 `used` 为分母，分成 `cached` / `prompt` / `think` / `out` 四段。
-- 每条进度条下方各配一排字母图例：总览条是 `u` / `r` / `f`，构成条是 `c` / `p` / `t` / `o`。每个条目是一个与条同款的一格色块，色块与字母、字母与该段的紧凑计数之间各空一格。
-- 在面板右上角给出百分比占用；token 总量不再单列一行，改由总览条那排图例（`u` / `r` / `f` 三项数字）承担。
-- 会话有新消息时自动刷新：订阅 `message.updated`、`message.part.updated`、`session.updated`、`session.idle` 四个事件，重绘做 50ms 前置节流；卸载时清理全部订阅，不用定时轮询。
-- 还没有 assistant 消息时显示 `no assistant turns yet`，不是空白，也不报错。
+## Features
 
-范围说明（逐条明确不做）：本项目刻意保持最小范围。面板不做工具级 token 排行，不做 token 趋势图，不拆分或展示子代理用量，不内置 tokenizer（例如 tiktoken），不注册自定义工具，也不提供 `/context` 命令，同样不做 SYSTEM/USER/ASSISTANT 这类角色归因。它只反映「最后一条携带 output token 的 assistant 消息」这一个快照。
+- Renders two configurable-width bars in the sidebar, one above the other: the overview bar uses `window` as its denominator and splits into `used` / `reserved` / `free`; the composition bar uses `used` as its denominator and splits into `cached` / `prompt` / `think` / `out`.
+- Each bar has its own row of letter legend beneath it: `u` / `r` / `f` for the overview bar, `c` / `p` / `t` / `o` for the composition bar. Each entry is a single-cell swatch styled like the bar, with one space between the swatch and the letter and one space between the letter and that segment's compact count.
+- Shows the percentage used in the panel's top-right corner; the token totals live on the overview legend row (the three numbers for `u` / `r` / `f`) instead of on a line of their own.
+- Refreshes automatically when the session gets a new message: it subscribes to `message.updated`, `message.part.updated`, `session.updated` and `session.idle`, throttles repaints with a 50ms leading edge, and clears every subscription on unmount without ever polling on a timer.
+- Shows `no assistant turns yet` before there is any assistant message, so the panel is neither blank nor an error.
 
-## 显示内容
+## Scope
 
-两条进度条的分段含义与颜色对照如下。
+The project is deliberately minimal. These things are explicitly out of scope: the panel does no per-tool token ranking, no token trend chart, does not break down or display subagent usage, ships no built-in tokenizer (tiktoken, for instance), registers no custom tools, offers no `/context` command, and does no SYSTEM/USER/ASSISTANT role attribution. It reflects exactly one snapshot: the last assistant message that carries output tokens.
 
-| 所属条 | segment id | 含义 | 颜色 token |
+## Display
+
+The bars' segments and their colours are listed below.
+
+| Bar | segment id | Meaning | Colour token |
 | --- | --- | --- | --- |
-| 总览条 | `used` | input + cacheRead + cacheWrite + reasoning + output | `primary` |
-| 总览条 | `reserved` | `limit.output - output` 的预留量 | `textMuted` |
-| 总览条 | `free` | 窗口剩余 | `text` |
-| 构成条 | `cached` | 缓存命中的输入 token（cache read） | `success` |
-| 构成条 | `prompt` | input + cacheWrite | `accent` |
-| 构成条 | `think` | reasoning | `secondary` |
-| 构成条 | `out` | output | `#ffff00`（硬编码） |
+| Overview | `used` | input + cacheRead + cacheWrite + reasoning + output | `primary` |
+| Overview | `reserved` | the amount reserved by `limit.output - output` | `textMuted` |
+| Overview | `free` | remaining window | `text` |
+| Composition | `cached` | cached input tokens (cache read) | `success` |
+| Composition | `prompt` | input + cacheWrite | `accent` |
+| Composition | `think` | reasoning | `secondary` |
+| Composition | `out` | output | `#ffff00` (hardcoded) |
 
-除 `out` 外，颜色 token 就是宿主主题里的字段名，取值来自 `api.theme.current.<token>`；`out` 用的是硬编码的 `#ffff00`。
+Except for `out`, a colour token is a field name in the host theme, resolved from `api.theme.current.<token>`; `out` uses the hardcoded `#ffff00`.
 
-`think` 用 `secondary`，这是一种蓝色，色相约 215 度，它与面板里其余每个颜色的色相距离都不小于约 46 度。`out` 用硬编码的 `#ffff00`，即纯黄，色相约 60 度，之所以硬编码，是因为 opencode 的默认主题里没有亮黄色。主题自带的黄都离得太近：`warning`（`#f5a742`，色相约 34 度）和 `markdownEmph`（`#e5c07b`，色相约 39 度）离 `used` 段所用的 `primary`（色相约 24 度）只有 10 到 15 度，两格色块放在一起几乎分不出来，正是这个面板要避免的撞色；而柠檬黄绿的 `diffHighlightAdded`（`#b8db87`，色相约 85 度）偏绿，不够黄。硬编码也有代价：`#ffff00` 不跟随宿主主题，在浅色（light）主题下观感会不合适。面板上一共五个颜色（`u` / `c` / `p` / `t` / `o`），选色时以「任意两色之间的最小色相距离最大」为准。
+`think` uses `secondary`, a blue at a hue of about 215 degrees and at least about 46 degrees of hue away from every other colour in the panel. `out` uses the hardcoded `#ffff00`, pure yellow at a hue of about 60 degrees, and the reason it is hardcoded is that the default opencode theme has no bright yellow. The theme's own yellows all sit too close: `warning` (`#f5a742`, hue about 34 degrees) and `markdownEmph` (`#e5c07b`, hue about 39 degrees) are only 10 to 15 degrees of hue from the `primary` (hue about 24 degrees) used by the `used` segment, so two adjacent swatches are nearly indistinguishable, the exact collision this panel has to avoid; and the lemon-green `diffHighlightAdded` (`#b8db87`, hue about 85 degrees) leans green rather than yellow. Hardcoding has a cost as well: `#ffff00` does not follow the host theme, so it looks out of place under a light theme. The panel has five colours in total (`u` / `c` / `p` / `t` / `o`), chosen to maximise the smallest hue distance between any two of them.
 
-面板最外层有一条 `borderSubtle` 色的边框，左右各留一列内边距。框内自上而下依次是标题行、总览条、构成条、第一排图例、第二排图例。标题行两端由 `space-between` 分列：左侧是 `Context` 标题，右端是占用百分比（形如 `42% used`）。
+The panel's outermost element is a border coloured `borderSubtle`, with one column of padding on each side. Inside, top to bottom, come the title row, the overview bar, the composition bar, the first legend row and the second legend row. The title row is split with `space-between`: `Context` on the left, the usage percentage (like `42% used`) on the right.
 
-两条进度条都铺满整行，用点阵字符绘制：每一段按分到的格数重复对应字符并染上该段颜色。总览条以 `window` 为分母，`used` 与 `reserved` 是实心 `▓`（U+2593），`free` 是空心 `░`（U+2591）；未占满的余量全部补成末尾的 `free`，所以三段格数之和恰好等于条宽（除非 `free` 被排除）。构成条以 `used` 为分母，`cached`、`prompt`、`think`、`out` 四段一律实心 `▓`，并且刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格，条右端允许留下这点空隙。
+Both bars span the full row and are drawn with block characters: each segment repeats its character for the cells it receives and colours it with the segment colour. The overview bar uses `window` as its denominator; `used` and `reserved` are solid `▓` (U+2593), `free` is hollow `░` (U+2591); the unused remainder is all appended as a trailing `free` segment, so the three segments' cells sum to exactly the bar width (unless `free` is excluded). The composition bar uses `used` as its denominator; `cached`, `prompt`, `think` and `out` are all solid `▓`, and no `free` tail is appended on purpose, so the four segments may sum to 0 to 2 cells less than the bar width, leaving that small gap at the bar's right end.
 
-两排图例只在 `showLegend` 为 `true` 时出现。第一排对应总览条，依次是 `u` / `r` / `f`；第二排对应构成条，依次是 `c` / `p` / `t` / `o`。每个条目由三部分组成，相邻两部分之间空一格：一个与条同款的一格色块，非 `free` 段是实心 `▓`（U+2593），`free` 段是空心 `░`（U+2591）；接着是一个小写字母；最后是该段的紧凑计数（如 `17.4K`）。字母取所属段的颜色，计数统一用 `textMuted`。
+The two legend rows appear only when `showLegend` is `true`. The first row matches the overview bar, in the order `u` / `r` / `f`; the second matches the composition bar, in the order `c` / `p` / `t` / `o`. Each entry has three parts, with one space between adjacent parts: a single-cell swatch styled like the bar, solid `▓` (U+2593) for non-`free` segments and hollow `░` (U+2591) for `free`; then a lowercase letter; then that segment's compact count (like `17.4K`). The letter takes the segment's colour and the count always uses `textMuted`.
 
-被 `exclude` 排除的段会同时从它所属的条和对应图例条目里消失，字母与计数一并消失。右上角的百分比与总览条的 `used` 段同色（`primary`），不再随占用分档变色。两条进度条的总列数都由面板实测宽度决定，会跟随实际可用宽度自适应：面板变宽时两条条一起变长，侧边栏收窄时两条条一起缩短，不会换行；右上角的百分比固定显示，不受条宽影响。
+A segment hidden by `exclude` disappears from both its bar and its legend entry, letter and count included. The percentage in the top-right corner uses the same colour as the overview bar's `used` segment (`primary`) and does not change colour with the usage level. Both bars take their total column count from the panel's measured width and adapt to the actual available width: when the panel widens both bars lengthen together, and when the sidebar narrows both bars shorten together, without wrapping; the top-right percentage stays fixed and is unaffected by the bar width.
 
-## 安装
+## Install
 
-前提：`opencode` 可用，版本满足「兼容性」一节的要求。
-
-方式一，npm 包：
+Prerequisite: `opencode` must be available, at a version that satisfies the "Compatibility" section. The plugin is built from source and loaded as a local directory; it does not go through any package manager.
 
 ```
-opencode plugin opencode-tui-context
-```
-
-也可以手动把包名写进 `tui.json` 的 `plugin` 数组：
-
-```json
-{
-  "plugin": ["opencode-tui-context@latest"]
-}
-```
-
-方式二，本地路径（本项目当前采用的方式）。把构建产物 `dist/` 与 `package.json` 复制到一个本地目录，再把该目录的绝对路径写进 `tui.json` 的 `plugin` 数组：
-
-```
+git clone https://github.com/owner/opencode-tui-context.git
+cd opencode-tui-context
+bun install
+bun run build
 mkdir -p ~/.config/opencode/local-plugins/opencode-tui-context
 cp -r dist package.json ~/.config/opencode/local-plugins/opencode-tui-context/
 ```
 
+The last step copies only `dist/` and `package.json`; the local approach has no use for the source or the development dependencies, so there's no need to put them in the target directory.
+
+Next, add the target directory to the `plugin` array in `~/.config/opencode/tui.json`:
+
 ```json
 {
-  "plugin": [
-    "/home/lee/.config/opencode/local-plugins/opencode-tui-context"
-  ]
+  "plugin": ["~/.config/opencode/local-plugins/opencode-tui-context"]
 }
 ```
 
-本地方式只需要 `dist/` 和 `package.json` 两个东西，源码与开发依赖不必放进那个目录。改完 `tui.json` 后重启 `opencode` 生效。
+`tui.json` is read only once when opencode starts and is not hot-reloaded, so `opencode` has to be restarted before the change takes effect.
 
-## 配置
+If the maintainer attaches a built `tui.js` to a GitHub Release, you can download it into the target directory and skip both the `bun install` and `bun run build` steps.
 
-选项写在 `plugin` 数组的元组第二项，形如 `["<spec>", { ... }]`，`<spec>` 是包名或本地绝对路径。
+The `owner` in the commands is a placeholder for a GitHub account. It has to be replaced with the real account before a public release, in `package.json` and in all three READMEs.
+
+## Configuration
+
+Options go in the second element of the `plugin` array tuple, in the form `["<spec>", { ... }]`, where `<spec>` is the local directory path.
 
 ```json
 {
   "plugin": [
     [
-      "opencode-tui-context@latest",
+      "~/.config/opencode/local-plugins/opencode-tui-context",
       { "barWidth": 40, "exclude": ["free"], "showLegend": true }
     ]
   ]
 }
 ```
 
-| 选项 | 默认值 | 规则与回退 |
+| Option | Default | Rules and fallback |
 | --- | --- | --- |
-| `barWidth` | `24` | 面板实测宽度出来之前的初始条宽（字符数）。先四舍五入，再夹到 `8-120`。非数字或非有限值（`NaN`、`±Infinity`）回退到 `24`；`0` 会被夹到 `8`，`999` 夹到 `120`。首帧之后条宽由面板实测宽度决定并自动跟随，`barWidth` 只在尚未测量时兜底。 |
-| `exclude` | `[]` | 要从两条进度条和对应图例里隐藏的 segment id 列表。只接受 `cached`、`prompt`、`think`、`out`、`reserved`、`free` 六个值，非法值被丢掉，重复值去重并保留首次出现的顺序。非数组回退到 `[]`。 |
-| `showLegend` | `true` | 是否显示两排字母图例。非布尔值回退到 `true`。设为 `false` 时只隐藏两排图例，两条进度条与右上角百分比保留。 |
+| `barWidth` | `24` | The initial bar width (in characters) before the panel's measured width is available. It is rounded first, then clamped to `8-120`. A non-number or non-finite value (`NaN`, `±Infinity`) falls back to `24`; `0` is clamped to `8`, `999` to `120`. After the first frame the bar width comes from the panel's measured width and follows it automatically; `barWidth` only covers the time before a measurement exists. |
+| `exclude` | `[]` | A list of segment ids to hide from both bars and their legend entries. It accepts only the six values `cached`, `prompt`, `think`, `out`, `reserved`, `free`; invalid values are dropped, and duplicates are de-duplicated keeping the order of first appearance. A non-array falls back to `[]`. |
+| `showLegend` | `true` | Whether to show the two letter legend rows. A non-boolean falls back to `true`. When set to `false`, only the two legend rows are hidden; both bars and the top-right percentage stay. |
 
-所有选项都经过规范化。配置缺省、为 `null`、类型不对，甚至整个选项对象根本不是对象，都不会抛错，一律回退到上表默认值。
+Every option is normalized. A missing config, `null`, a wrong type, or even an options object that is not an object at all never throws: they all fall back to the defaults in the table above.
 
-## 计算口径
+## Computation
 
-设 `input`、`cacheRead`、`cacheWrite`、`reasoning`、`output` 为被测量消息的 token 统计，`limit.context` 与 `limit.output` 为该消息所用模型的上下文与输出限额。各量定义如下：
+Let `input`, `cacheRead`, `cacheWrite`, `reasoning` and `output` be the token counts of the measured message, and `limit.context` and `limit.output` the context and output limits of the model that message used. The quantities are defined as follows:
 
 ```
 used     = input + cacheRead + cacheWrite + reasoning + output
-window   = limit.context        # > 0 时有效，否则取 0
+window   = limit.context
 reserved = max(0, limit.output - output)
 free     = max(0, window - used - reserved)
 prompt   = input + cacheWrite
 percent  = min(100, round(used / window * 100))
 ```
 
-几点说明：
+A few notes:
 
-- 被测量的对象是会话里最新的一条携带 `tokens.output > 0` 的 assistant 消息。从消息列表尾部往前找，第一条同时满足 `role === "assistant"` 与 `tokens.output > 0` 的消息就是数据源。
-- 当 `window` 为 `0`（模型限额拿不到）时，`free` 与 `percent` 都取 `0`，总览条因为没有分母而整体留空，构成条与两排图例照常渲染。
-- `reserved` 只在 `limit.output > 0` 时计算，否则为 `0`。
-- 总览条的 `used` 与 `reserved` 按 `round(段 token / window * barWidth)` 分配，未占满的余量全部补成末尾的 `free` 段（除非 `free` 在 `exclude` 里），三段之和恰好等于条宽。
-- 构成条的 `cached`、`prompt`、`think`、`out` 按 `round(段 token / used * barWidth)` 分配，刻意不补 `free` 尾巴，四段之和可能比条宽少 0 到 2 格。
-- 视觉保底对两条条都生效：一个 `token > 0` 的段若四舍五入后不足 `1` 格，会被补足为 `1` 格，避免整段从条与图例里消失。补格时先扣未分配的余量，余量不足则从当前最宽的段借一格；若两者都腾不出格子，该段仍不显示。
-- 只有 token 数 `> 0` 的段才会进入条与图例。
+- The measured object is the newest assistant message in the session that carries `tokens.output > 0`. Scanning the message list backwards from the end, the first message that satisfies both `role === "assistant"` and `tokens.output > 0` is the data source.
+- When `window` is `0` (the model's limit cannot be obtained), both `free` and `percent` are `0`, the overview bar is left entirely empty because it has no denominator, and the composition bar and both legend rows render as usual.
+- `reserved` is computed only when `limit.output > 0`; otherwise it is `0`.
+- The overview bar's `used` and `reserved` are allocated by `round(segment tokens / window * barWidth)`, and the unused remainder is all appended as a trailing `free` segment (unless `free` is in `exclude`), so the three segments sum to exactly the bar width.
+- The composition bar's `cached`, `prompt`, `think` and `out` are allocated by `round(segment tokens / used * barWidth)`, and no `free` tail is appended on purpose, so the four segments may sum to 0 to 2 cells less than the bar width.
+- A visual floor applies to both bars: a segment with `token > 0` that rounds to less than `1` cell is topped up to `1` cell so it never silently disappears from the bar and the legend. The floor is paid from the unallocated remainder first; if there is not enough, it borrows one cell from the currently widest segment; if neither can spare a cell, that segment stays hidden.
+- Only segments whose token count is `> 0` enter a bar. Both legend rows list every segment that is not excluded, so a segment with no tokens still appears there with a count of `0`.
 
-## 兼容性
+## Compatibility
 
-- 实测的 `opencode` 版本：`1.18.31`。
-- `@opentui/solid` 在本项目实测解析到的版本：`0.4.5`；`package.json` 对它的 peer 要求是 `>=0.4.5`。
-- 宿主会把本插件对 `@opentui/solid` 与 `solid-js` 的导入重写到宿主自带的模块上。也就是说，插件的 `devDependencies` 版本只影响构建产物的形状，不决定运行时的模块解析；运行时用的是宿主自己的那一份。
-- 本插件没有运行时依赖（`dependencies` 为空），产物只引用宿主提供的模块与 Node 内置模块。
+- The measured `opencode` version: `1.18.31`; `package.json`'s engines requirement for it is `>=1.18.0`.
+- The `@opentui/solid` version this project resolved in practice: `0.4.5`; `package.json`'s peer requirement for it is `>=0.4.5`.
+- The host rewrites this plugin's imports of `@opentui/solid` and `solid-js` to its own bundled modules. In other words, the plugin's `devDependencies` versions only affect the shape of the build output, not runtime module resolution; at runtime the host's own copy is used.
+- The plugin has no runtime dependencies (its `dependencies` is empty); its output references only host-provided modules and Node built-ins.
 
-## 与其它插件共存
+## Coexistence with other plugins
 
-`sidebar_content` 是宿主提供的一个共享槽位，多个插件可以往同一个槽位注册内容。本插件以 `order: 60` 注册该槽位。`order` 的值定义在插件实现里，不写在 `tui.json` 中。
+`sidebar_content` is a shared slot provided by the host, and multiple plugins can register content into the same slot at the same time. This plugin registers that slot at `order: 60`. The `order` value is defined in the plugin's implementation, not in `tui.json`.
 
-`opencode-plugin-context` 同样注册 `sidebar_content`。两者同时启用，侧边栏会出现两个内容重叠的上下文面板，所以本项目只保留本插件，`"opencode-plugin-context@latest"` 已经从 `tui.json` 的 `plugin` 数组里移除。
+If another plugin also writes a context panel into `sidebar_content`, enabling both at once puts two overlapping panels in the sidebar. Keep just one of them: remove the one you don't need from the `plugin` array in `tui.json`.
 
-作为参考，本项目当前用户 `tui.json` 的 `plugin` 数组包含六项：
+The host's built-in context panel registers the same slot. If you don't want it to overlap this plugin, set `"internal:sidebar-context"` to `false` in `tui.json`'s `plugin_enabled`. This plugin has no entry in `plugin_enabled`, so it stays enabled.
 
-```json
-"plugin": [
-  "oh-my-openagent@latest",
-  ["opencode-zh-plugin", { "tuiSlots": false, "commands": false }],
-  "opencode-visual-cache@latest",
-  "/home/lee/.config/opencode/local-plugins/opencode-tui-deepseek-cny",
-  "@tarquinen/opencode-dcp@latest",
-  "/home/lee/.config/opencode/local-plugins/opencode-tui-context"
-]
-```
+## Disable and uninstall
 
-其 `plugin_enabled` 里只有一个键，即 `"internal:sidebar-context": false`，它关掉宿主内置的上下文面板，免得它在同一个槽位里再画一个重叠的面板；本插件在 `plugin_enabled` 里没有条目，所以保持启用。如果以前用过内置的上下文面板，注意保持这一项为 `false`。
+To disable it temporarily and keep the files for re-enabling later: open `~/.config/opencode/tui.json` and remove the `~/.config/opencode/local-plugins/opencode-tui-context` entry from the `plugin` array. If you want the host's built-in context panel back, set `"internal:sidebar-context"` to `true` in `plugin_enabled`.
 
-## 停用与卸载
-
-只想暂时停用、保留文件以便日后重新启用：打开 `~/.config/opencode/tui.json`，从 `plugin` 数组里移除 `/home/lee/.config/opencode/local-plugins/opencode-tui-context` 这一项即可。如果还想把宿主内置的上下文面板请回来，再在 `plugin_enabled` 里把 `"internal:sidebar-context"` 设为 `true`。
-
-彻底卸载：先按上面的步骤停用，再删掉本地目录：
+To uninstall completely: first disable it as above, then delete the local directory:
 
 ```
 rm -rf ~/.config/opencode/local-plugins/opencode-tui-context
 ```
 
-改 `tui.json` 时最好先做一次备份，记下哈希：
+When editing `tui.json`, it's best to front it with a backup and record the hash:
 
 ```
 B=/tmp/tui.json.before-$(date +%s%N)
@@ -165,13 +152,15 @@ cp ~/.config/opencode/tui.json "$B"
 sha256sum "$B"
 ```
 
-需要还原时把备份复制回去，再校验哈希与备份一致：
+To restore, copy the backup back and verify the hash matches the backup:
 
 ```
 cp /tmp/tui.json.before-<timestamp> ~/.config/opencode/tui.json
 sha256sum ~/.config/opencode/tui.json
 ```
 
-如果是从 npm 安装的，停用就是从 `plugin` 数组里移除 `"opencode-tui-context@latest"`；本地文件只需删掉 `~/.config/opencode/local-plugins/opencode-tui-context/` 目录。
+`tui.json` is read only once when opencode starts and is not hot-reloaded, so `opencode` has to be restarted before the change takes effect.
 
-`tui.json` 只在 opencode 启动时读取一次，不做热重载，改完要重启 `opencode` 才生效。
+## License
+
+Released under the MIT License; see [LICENSE](LICENSE) for the full terms.

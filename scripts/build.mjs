@@ -2,16 +2,17 @@ import { build } from "esbuild";
 import { transformAsync } from "@babel/core";
 import presetSolid from "babel-preset-solid";
 import presetTypeScript from "@babel/preset-typescript";
+import assert from "node:assert/strict";
 import { mkdirSync, readFileSync } from "node:fs";
 mkdirSync("dist", { recursive: true });
-await build({
-  entryPoints: ["src/tui.tsx"],
+const runtimeModules = ["@opencode-ai/plugin", "@opencode/plugin", "@opentui/core", "@opentui/solid", "solid-js"];
+const options = {
   bundle: true,
   format: "esm",
   platform: "node",
   target: "es2022",
-  // Compile reactive JSX before bundling. Automatic JSX evaluates props once and
-  // would leave token counts, theme changes and measured widths stale in V2.
+  // Both adapters share the reactive panel. Compile JSX before bundling so the
+  // host's Solid runtime observes token counts, themes and measured widths.
   plugins: [{
     name: "opentui-solid",
     setup(build) {
@@ -30,7 +31,22 @@ await build({
       });
     },
   }],
-  external: ["@opencode/plugin", "@opentui/core", "@opentui/solid", "solid-js"],
-  outfile: "dist/tui.js",
   logLevel: "info",
-});
+};
+const [entry] = await Promise.all([
+  build({
+    ...options,
+    entryPoints: ["src/tui.tsx"],
+    external: ["./tui-v1.js", "./tui-v2.js"],
+    outfile: "dist/tui.js",
+    metafile: true,
+  }),
+  ...["v1", "v2"].map((version) => build({
+    ...options,
+    entryPoints: [`src/tui-${version}.tsx`],
+    external: runtimeModules,
+    outfile: `dist/tui-${version}.js`,
+  })),
+]);
+assert.deepEqual(Object.keys(entry.metafile.inputs), ["src/tui.tsx"],
+  "The universal entry must not bundle an adapter or host runtime.");

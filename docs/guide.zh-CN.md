@@ -10,31 +10,34 @@
 
 ### 环境要求
 
-- **OpenCode `>=2.0.32 <3`**，以及本插件的 `2.x` 版本。开发 SDK 固定为 `@opencode/plugin@2.0.32`；声明范围不表示每个宿主版本均已实测。详见 [package.json](../package.json)。
-- V1 用户请固定使用 **`opencode-tui-context@1.0.1`**，并参考 [V1 README](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)。V2 构建产物不能在 V1 中加载。
-- 源码安装需要 **Git、[Bun](https://bun.sh/) 和 [Node.js](https://nodejs.org/)**；已发布的 npm 包和 ZIP 无需本地构建。
+- **OpenCode V1 `>=1.18.31 <2` 或 V2 `>=2.0.32 <3`**。同一份 `2.1.0` 包含两个适配器，自动匹配宿主 API。验证基线为 V1 `1.18.31` 和 V2 `2.0.32`；声明范围不表示每个版本均已实测。详见 [package.json](../package.json)。
+- 源码安装需要 **Git、[Bun](https://bun.sh/) 和 [Node.js](https://nodejs.org/)**；npm 包和 ZIP 无需本地构建。
+- V1 用户可以升级到 `2.1.0`。如需保留旧安装，可继续使用 `1.0.1` 及其[对应指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)，无需为了 V1 兼容而固定旧版。
 
 ### npm 安装
 
-```sh
-opencode plugin add opencode-tui-context@2.0.1
-```
+先运行 `opencode --version`，再选择对应命令：
 
-此命令将纯 CLI 插件写入全局 `cli.json`。OpenCode V2 只有全局 CLI 配置，不支持项目级 `cli.json`。详见宿主的[插件命令](https://opencode.ai/v2/docs/cli/commands/#plugin)和 [CLI 设置](https://opencode.ai/v2/docs/cli/config/)。
+| 宿主 | 命令 | 写入位置 |
+| --- | --- | --- |
+| V1 | `opencode plugin -g opencode-tui-context@2.1.0` | 全局 `tui.json` 的 `plugin` 数组 |
+| V2 | `opencode plugin add opencode-tui-context@2.1.0` | 全局 `cli.json` 的 `plugins` 数组 |
 
-从 V1 迁移时，从 `tui.json` 中移除本插件旧条目，再将 V2 条目加入 `cli.json`。原有 `[package, options]` 元组需改为[对象形式](#配置)。保留其他设置和插件，避免同时加载本地副本与 npm 包。
+V1 去掉 `-g` 可安装到当前项目，详见 [V1 插件规范](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)。V2 只有全局 CLI 配置，详见 [V2 插件命令](https://opencode.ai/v2/docs/cli/commands/#plugin)。
+
+将 OpenCode 从 V1 升级到 V2 时，把本插件条目从 `tui.json` 移到 `cli.json`，并将元组转换为[对象形式](#配置)。保留其他设置和插件；本插件只保留一个 npm 或本地条目。
 
 ### 备用方式：预构建 ZIP
 
 Release 提供预构建 ZIP，可在 npm 不可用时安装：
 
 1. 打开 [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases)，在 **Assets** 中下载 `opencode-tui-context-<version>.zip`。GitHub 自动生成的 **Source code** 压缩包仍需编译。
-2. 将压缩包中的 `opencode-tui-context` 目录解压到 `cli.json` 同级的 `local-plugins/` 中。默认全局位置是 `~/.config/opencode/local-plugins/`（Windows 为 `$HOME\.config\opencode\local-plugins\`）。保留其中的 `package.json`、根目录 `tui.js` 和 `dist/tui.js`。
+2. 将压缩包中的 `opencode-tui-context` 目录解压到 `tui.json`（V1）或 `cli.json`（V2）同级的 `local-plugins/` 中。默认全局位置是 `~/.config/opencode/local-plugins/`（Windows 为 `$HOME\.config\opencode\local-plugins\`）。完整保留其中的 `package.json`、根目录 `tui.js` 和 `dist/` 目录。
 3. 添加下方的[本地插件配置](#启用本地安装)，然后重启 OpenCode。
 
 ### 从源码安装
 
-需要 Git、Bun 和 Node.js。克隆仓库并构建 `dist/tui.js`：
+需要 Git、Bun 和 Node.js。克隆仓库并构建插件包：
 
 ```sh
 git clone https://github.com/SolitudeRA/opencode-tui-context.git
@@ -43,7 +46,7 @@ bun install --frozen-lockfile
 bun run build
 ```
 
-构建产物为 `dist/tui.js`；仓库根目录的 `tui.js` 用于在本地安装时加载它。
+构建生成 `dist/tui.js`、`dist/tui-v1.js` 和 `dist/tui-v2.js`；根目录 `tui.js` 提供本地加载入口。
 
 在仓库根目录，根据系统将构建产物与清单复制到全局插件目录。
 
@@ -64,7 +67,17 @@ Copy-Item -Path dist, package.json, tui.js -Destination $pluginDir -Recurse -For
 
 ### 启用本地安装
 
-将下列条目合并到全局 `cli.json`，保留其他设置和插件。默认位置为 `~/.config/opencode/cli.json`（Windows 为 `$HOME\.config\opencode\cli.json`）；设置了 `$XDG_CONFIG_HOME` 时，用它代替 `~/.config`。
+将插件放在对应配置文件旁：V1 使用 `tui.json`，V2 使用 `cli.json`。默认全局目录为 `~/.config/opencode/`（Windows 为 `$HOME\.config\opencode\`）；设置了 `$XDG_CONFIG_HOME` 时，用它代替 `~/.config`。
+
+**V1 — `tui.json`**
+
+```json
+{
+  "plugin": ["./local-plugins/opencode-tui-context"]
+}
+```
+
+**V2 — `cli.json`**
 
 ```json
 {
@@ -72,23 +85,26 @@ Copy-Item -Path dist, package.json, tui.js -Destination $pluginDir -Recurse -For
 }
 ```
 
-请完整保留下列三个文件。本地目录加载需要根目录 `tui.js`，npm 加载使用清单的 `./tui` 导出，两者都指向同一份 `dist/tui.js`。安装目录无需源码或 `node_modules`。
+请完整保留下列五个文件。根目录入口和 npm 的 `./tui` 导出均指向 `dist/tui.js`，再按需加载对应适配器，不要只复制其中一个适配器。安装目录无需源码或 `node_modules`。
 
 ```text
 local-plugins/opencode-tui-context/
 ├── package.json
 ├── tui.js
 └── dist/
-    └── tui.js
+    ├── tui.js
+    ├── tui-v1.js
+    └── tui-v2.js
 ```
 
-路径相对于 `cli.json` 所在目录解析。使用自定义配置位置时，请调整复制目录或指定插件绝对路径。Windows JSON 路径可用正斜杠，例如 `D:/Codeing/opencode-tui-context`；插件条目内使用完整路径，避免 `~/...`。详见 [CLI 插件配置](https://opencode.ai/v2/docs/cli/plugins/)。
+插件路径相对于包含该条目的配置文件解析。使用自定义配置位置时，请调整复制目录或指定绝对路径。Windows JSON 路径可用正斜杠，例如 `D:/Codeing/opencode-tui-context`。请使用完整路径，避免 `~/...`。
 
 ### 显示面板
 
-重启 OpenCode 并打开会话。在 `cli.json` 中将 `session.sidebar` 设为 `"auto"`，并使用足够宽的终端。**Context** 面板追加在 `sidebar.content` 末尾，与宿主原有内容共存，不会替换其他侧栏组件。
+重启 OpenCode，打开会话并显示侧栏。**Context** 面板追加在原有侧栏中；尚无符合条件的 assistant 用量时，显示 `no usage snapshot yet`。
 
-面板读取当前有效上下文内最近一份 assistant 用量；没有符合条件的数据，或压缩完成后尚未产生新的 assistant 用量时，显示 `no usage snapshot yet`。V2 不使用 V1 的 `plugin_enabled` 配置。详见宿主的[侧栏设置](https://opencode.ai/v2/docs/cli/config/#sessions)。
+- **V1：**在插件管理器中启用 `opencode-tui-context`。如需隐藏内置上下文面板，可在 `tui.json` 中将 `plugin_enabled["internal:sidebar-context"]` 设为 `false`。插件管理器保存的状态可能覆盖该设置，详见[启用状态优先级](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#tui-config)。
+- **V2：**在 `cli.json` 中将 `session.sidebar` 设为 `"auto"`，并使用足够宽的终端。V2 不使用 V1 的 `plugin_enabled`，详见[侧栏设置](https://opencode.ai/v2/docs/cli/config/#sessions)。
 
 ## 读懂面板
 
@@ -108,17 +124,33 @@ local-plugins/opencode-tui-context/
 
 侧边栏变窄时，每组图例会依次将计数移到标记下方、隐藏计数、隐藏整组图例。标题会先隐藏百分比，再隐藏 `Context`。增大侧边栏宽度后，细节会重新显示。
 
-大多数颜色随 V2 宿主主题变化，分别使用交互色、强调色、成功和信息文字色、弱化文字色与基础文字色。输出段固定使用黄色（`#ffff00`），在浅色主题下可能对比度不足。
+两个适配器分别读取对应宿主主题，大多数颜色随主题变化。输出段固定使用黄色（`#ffff00`），在浅色主题下可能对比度不足。
 
 ## 配置
 
-npm 安装时，在 `cli.json` 中使用对象形式。保留版本后缀即可固定版本：
+两个适配器接受相同选项。请编辑对应宿主配置中的已有条目，保留版本后缀和其他设置。
+
+**V1 — `tui.json`**
+
+```json
+{
+  "plugin": [
+    ["opencode-tui-context@2.1.0", {
+      "barWidth": 24,
+      "exclude": [],
+      "showLegend": true
+    }]
+  ]
+}
+```
+
+**V2 — `cli.json`**
 
 ```json
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.0.1",
+      "package": "opencode-tui-context@2.1.0",
       "options": {
         "barWidth": 24,
         "exclude": [],
@@ -129,7 +161,7 @@ npm 安装时，在 `cli.json` 中使用对象形式。保留版本后缀即可�
 }
 ```
 
-ZIP 或源码安装请将示例中的包名替换为 `"./local-plugins/opencode-tui-context"`。修改已有条目即可，不要重复添加。
+ZIP 或源码安装时，将对应示例中的包名替换为 `"./local-plugins/opencode-tui-context"`。修改已有条目，不要重复添加。
 
 | 选项 | 类型 | 默认值 | 行为 |
 | --- | --- | --- | --- |
@@ -145,7 +177,7 @@ ZIP 或源码安装请将示例中的包名替换为 `"./local-plugins/opencode-
 
 ## 用量如何计算
 
-插件在当前有效上下文中从后向前查找，选取最新一条 `tokens.output` 为数值且大于零的 assistant 消息。已回退的消息不参与计算，也不会越过已完成的压缩边界。压缩完成后，面板等待新的 assistant 用量快照，不显示压缩前的用量或压缩请求本身的 token。模型上限根据该消息的 `model.providerID` / `model.id` 查找，即使你后来切换了模型也是如此。
+插件在当前有效上下文中从后向前查找，选取最新一条 `tokens.output` 为数值且大于零的 assistant 消息。已回退的消息不参与计算，也不会越过已完成的压缩边界。压缩完成后，面板等待新的 assistant 用量快照，不显示压缩前的用量或压缩请求本身的 token。模型上限根据该消息的模型标识（V1 的 `providerID` / `modelID`，V2 的 `model.providerID` / `model.id`） 查找，即使你后来切换了模型也是如此。
 
 ```text
 used     = input + cacheRead + cacheWrite + reasoning + output
@@ -165,7 +197,7 @@ percent  = min(100, round(used / window × 100))
 
 每个分段按比例获得四舍五入后的字符格数，最多使用当前剩余宽度。如果正数用量被取整为零格，会在剩余空间或较宽分段可让出格子时，补到至少一格。总览条把余下格子填充为 `free`，除非它被排除；构成条不填补取整后的空隙。因此条宽是近似展示，尤其是用量很小的分段。
 
-面板通过 Solid 响应式读取 OpenCode V2 的会话、消息、模型和主题缓存。每个挂载面板独立测量宽度，没有轮询或事件节流；插件卸载时由宿主移除插槽和响应式计算。新回复尚未报告输出 token 时，面板可能仍然显示上一份符合条件的快照。
+V2 通过 Solid 读取宿主响应式缓存，V1 根据宿主状态和事件刷新。每个面板独立测量宽度，卸载时释放插槽和订阅；两个适配器均不轮询。新回复尚未报告输出 token 时，面板可能仍然显示上一份符合条件的快照。
 
 </details>
 
@@ -173,8 +205,8 @@ percent  = min(100, round(used / window × 100))
 
 | 现象 | 检查方法 |
 | --- | --- |
-| 安装命令不可用 | 运行 `opencode --version` 和 `opencode plugin --help`。当前插件需要 V2；继续使用 V1 时，请保留插件 `1.0.1`。 |
-| 没有面板 | 检查宿主版本、`cli.json` 条目和 `session.sidebar: "auto"`，并加宽终端。本地安装还需确认 `package.json` + 根目录 `tui.js` + `dist/tui.js` 布局，然后重启。 |
+| 安装命令不可用 | 运行 `opencode --version` 和 `opencode plugin --help`。根据宿主版本选择上方 V1 或 V2 命令。 |
+| 没有面板 | 检查对应配置（V1 的 `tui.json` 或 V2 的 `cli.json`）、插件启用状态及侧栏是否可见。本地安装需保留根目录入口和全部三个 `dist/` 文件，再重启。 |
 | 显示 `no usage snapshot yet` | 当前没有符合条件且输出 token 为正数的 assistant 消息；已回退消息和已完成压缩之前的用量会被排除。 |
 | 有 token，但总览条为空 / 显示 `0% used` | 无法取得生成该消息的模型的正数上下文上限，请检查其提供商元数据。 |
 | 窄侧栏中计数或百分比消失 | 响应式布局会隐藏放不下的信息。请加宽终端或侧栏；`barWidth` 不会覆盖实际测量宽度。 |
@@ -185,14 +217,14 @@ percent  = min(100, round(used / window × 100))
 
 ## 更新与移除
 
-**npm：**运行 `opencode plugin check` 检查可用更新。需要指定某个已发布 V2 版本时，仅修改 `cli.json` 中本插件的 `package` 版本后缀，保留选项并重启。宿主更新命令的参数见 `opencode plugin update --help`。V1 用户应继续固定 `1.0.1`。
-
-**ZIP：**用新版 V2 产物替换安装目录，保留 `cli.json` 中的路径。**源码：**更新没有本地改动的工作副本，重新构建并复制产物，然后重启 OpenCode。
-
-从全局配置移除 npm 条目：
+**V1 npm：**更新已有条目并保留元组选项：
 
 ```sh
-opencode plugin remove opencode-tui-context
+opencode plugin -g opencode-tui-context@2.1.0 --force
 ```
 
-也可从 `cli.json` 的 `plugins` 数组中移除本插件条目后重启。本地安装随后可删除复制出的 `local-plugins/opencode-tui-context` 目录。请保留其他插件和 OpenCode 配置。
+**V2 npm：**运行 `opencode plugin check` 检查可用更新。要指定某个已发布版本，只修改 `cli.json` 中本插件的 `package` 版本后缀，保留选项。宿主更新命令见 `opencode plugin update --help`。
+
+**ZIP：**完整替换插件安装目录，保留配置中的路径。**源码：**更新没有本地改动的工作副本，重新构建并复制。完成后重启 OpenCode。
+
+移除时，删除 V1 的 `tui.json` → `plugin` 或 V2 的 `cli.json` → `plugins` 中本插件的条目，再重启。V2 也可使用 `opencode plugin remove opencode-tui-context`；V1 `1.18.31` 没有卸载命令。本地安装随后可删除复制出的插件目录。保留其他插件和配置；若曾在 V1 中停用内置上下文面板，可重新启用。

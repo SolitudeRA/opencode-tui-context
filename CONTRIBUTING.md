@@ -4,40 +4,39 @@
 
 ## Development
 
-Use Git, Bun, and Node.js for development, plus OpenCode `2.0.32` for host verification. The V2 SDK is pinned in `package.json`. After cloning the repository:
+Use Git, Bun, and Node.js. Host validation targets OpenCode V1 `1.18.31` and V2 `2.0.32`; SDK versions are pinned in `package.json`. After cloning:
 
 ```sh
 bun install --frozen-lockfile
 bun run typecheck
 bun test
 bun run test:render
-```
-
-To prepare the npm tarball, prebuilt ZIP, and checksums locally:
-
-```sh
 npm run release:pack
 ```
 
-Artifacts are written to `release/`; this command does not publish them. See the [release guide](docs/releasing.md) for the initial npm setup, automated publication, and host installation checks.
+`release:pack` writes npm and ZIP archives plus checksums to `release/`; it does not publish. See the [release guide](docs/releasing.md) for publication and host acceptance.
 
-Unit tests cover options, usage arithmetic, active-context selection, bar allocation, colors, legends, and narrow widths. `test:render` rebuilds `dist/tui.js` and runs it in the real OpenTUI test renderer against a mocked V2 host context. Its nine scenario groups cover empty state, reactive token updates, message-model lookup, session/location switching, revert boundaries, compaction, resizing, theme changes, and cleanup. It uses no network requests and does not launch OpenCode.
+Unit tests cover configuration, usage arithmetic, active-context selection in both APIs, event cleanup, and responsive layout. `test:render` builds all three bundles, verifies lazy entrypoint loading, and runs both adapters in their matching native OpenTUI test renderer with mocked host contexts. These checks make no model requests and do not launch OpenCode. They do not establish actual host loading or npm installation; validate those separately on both host baselines and distinguish synthetic fixtures from real-provider usage.
 
-For host acceptance, repeat those scenarios inside OpenCode. Record the exact host version and distinguish local fixtures from real provider usage; renderer contract tests do not verify the host's plugin loader or npm installation.
+## Source layout
 
 | File | Responsibility |
 | --- | --- |
-| [`tui.js`](tui.js) | Local-directory entry that loads the built `dist/tui.js` bundle |
-| [`src/tui.tsx`](src/tui.tsx) | V2 `Plugin.define()` entry and ID (`opencode-tui-context`) |
-| [`src/plugin.tsx`](src/plugin.tsx) | Options and `sidebar.content` slot registration and cleanup |
-| [`src/panel.tsx`](src/panel.tsx) | Theme colors, model lookup, and responsive rendering |
-| [`src/usage.ts`](src/usage.ts) | Message selection and usage calculation |
-| [`src/format.ts`](src/format.ts) | Compact counts and character-cell allocation |
-| [`src/options.ts`](src/options.ts) | Configuration defaults and validation |
-| [`scripts/build.mjs`](scripts/build.mjs) | Solid JSX compilation with Babel, followed by ESM bundling with esbuild |
-| [`scripts/test-render.mjs`](scripts/test-render.mjs) | Nine scenario groups against the built bundle in OpenTUI's native test renderer |
-| [`scripts/release.mjs`](scripts/release.mjs) | Build and validate the npm tarball, prebuilt ZIP, and SHA-256 checksums |
+| [`tui.js`](tui.js) | Root entry for local directory loading |
+| [`src/tui.tsx`](src/tui.tsx) | Universal entry; lazily selects the V1 `tui` or V2 `setup` adapter |
+| [`src/tui-v1.tsx`](src/tui-v1.tsx), [`src/v1/plugin.tsx`](src/v1/plugin.tsx) | V1 module, state/events, theme, and `sidebar_content` registration |
+| [`src/tui-v2.tsx`](src/tui-v2.tsx), [`src/plugin.tsx`](src/plugin.tsx) | V2 `Plugin.define()`, options, and `sidebar.content` registration |
+| [`src/panel.tsx`](src/panel.tsx) | Shared responsive rendering and V2 data/theme adapter |
+| [`src/usage.ts`](src/usage.ts), [`src/v1/usage.ts`](src/v1/usage.ts) | Common arithmetic and host-specific message/model selection |
+| [`src/v1/refresh.ts`](src/v1/refresh.ts) | V1 event subscriptions and disposal |
+| [`src/format.ts`](src/format.ts), [`src/options.ts`](src/options.ts) | Cell allocation, compact counts, and configuration validation |
+| [`scripts/build.mjs`](scripts/build.mjs) | Solid JSX compilation and three fixed ESM bundles |
+| [`scripts/test-entrypoints.mjs`](scripts/test-entrypoints.mjs) | Lazy entrypoint selection and dependency isolation |
+| [`scripts/test-render.mjs`](scripts/test-render.mjs), [`scripts/test-render-v1.mjs`](scripts/test-render-v1.mjs) | Native V2/V1 renderer contract checks |
+| [`scripts/release.mjs`](scripts/release.mjs) | Archive contents, export paths, and checksum validation |
 
-The bundle leaves `@opencode/plugin/tui`, OpenTUI, and Solid imports external for the V2 host to provide. The manifest declares optional peer dependencies and no runtime `dependencies`; copying development dependencies into the installed plugin is unnecessary. Local copies need `package.json`, the root `tui.js`, and `dist/tui.js`; npm uses the manifest's `./tui` export. Keep the Solid JSX transform: replacing it with a generic JSX transform can compile successfully while breaking reactive rendering.
+Keep the universal entry free of runtime SDK or renderer imports: each host must load only its own adapter. The V2 adapter uses `@opencode/plugin/tui` and `Plugin.define()`; the V1 adapter uses the legacy module contract. OpenTUI and Solid remain external and are supplied by the host. Optional peers describe compatibility; no runtime `dependencies` or copied development dependencies are needed.
 
-Contributions are welcome. Keep changes focused, run the checks above, and describe the user-visible behavior and validation in your pull request. For behavior changes, update the relevant tests and keep the English, Chinese, and Japanese READMEs, [user guides](docs/guide.md), and contribution guides aligned. Discuss larger scope changes in an issue first.
+Local installations need `package.json`, the root `tui.js`, and all three files in `dist/`: `tui.js`, `tui-v1.js`, `tui-v2.js`. Keep the Solid JSX transform; a generic JSX transform can compile successfully while breaking reactive rendering.
+
+Keep changes focused, run the checks above, and describe user-visible behavior and validation in your pull request. Update relevant tests when behavior changes and keep the English, Chinese, and Japanese READMEs, user guides, and contribution guides aligned. Discuss larger scope changes in an issue first.

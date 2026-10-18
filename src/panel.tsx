@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
+import type { Plugin } from "@opencode/plugin/tui"
 import { RGBA, type BoxRenderable } from "@opentui/core"
-import { createSignal } from "solid-js"
+import { createMemo, createSignal, onMount, Show, type Accessor } from "solid-js"
 import { formatCompact, formatCompositionBar, formatOverviewBar, formatPercent } from "./format"
 import type { OverviewSegmentId, PluginOptions_, SegmentId, Usage, UsageLimits } from "./types"
 import { computeUsage, lastAssistantWithTokens, type AssistantUsage } from "./usage"
@@ -9,45 +9,34 @@ import { computeUsage, lastAssistantWithTokens, type AssistantUsage } from "./us
 export const BAR_FILLED = "\u2593"
 export const BAR_EMPTY = "\u2591"
 
-// Measured outer width of the panel box, in columns. Module scope on purpose: every tick rebuilds
-// the whole tree without fine-grained reactivity, so a per-build signal would reset before anything
-// could read it. `config.barWidth` only seeds this until the box reports a size.
-const [panelWidth, setPanelWidthSignal] = createSignal(24)
-
-/** Latest mounted panel box; written by `ref`, read by `onSizeChange` and the resync effect. */
-let panelBox: BoxRenderable | undefined
-
-/** Sets the panel's outer width in columns. The bars derive their length from it. */
-export function setPanelWidth(width: number): void {
-  setPanelWidthSignal(width)
-}
-
 /** Bar cells available inside the frame: 1 border + 1 padding column on each side. Clamped at
  *  zero, never raised: a floor above the real content width would push rows past the frame. */
-export function effectiveWidth(): number {
-  return Math.max(0, panelWidth() - 4)
-}
-
-/** Adopts the mounted box's measured width; non-finite and non-positive measurements are ignored. */
-export function syncPanelWidth(): void {
-  const width = panelBox?.width
-  if (typeof width === "number" && Number.isFinite(width) && width > 0) setPanelWidth(width)
+export function effectiveWidth(width: number): number {
+  return Math.max(0, width - 4)
 }
 
 export type ResolvedOptions = Required<PluginOptions_>
-export type Theme = TuiPluginApi["theme"]["current"]
-// `Theme` also carries `thinkingOpacity: number`, so colour lookups are keyed by RGBA-valued tokens only.
-export type ThemeColorKey = { [K in keyof Theme]: Theme[K] extends Theme["text"] ? K : never }[keyof Theme]
-export type ThemeColor = Theme["text"]
+/** Small palette resolved from V2 semantic tokens, shared by bars and their legends. */
+export type Theme = Record<"primary" | "secondary" | "accent" | "success" | "warning" | "text" | "textMuted" | "borderSubtle", RGBA>
+export type ThemeColorKey = keyof Theme
+export type ThemeColor = RGBA
 
-// The theme has no bright yellow: its only yellows (`warning` ~34 deg, `markdownEmph` ~39 deg) sit
-// only 10-15 deg of hue from the overview bar's `used` (`primary` ~24 deg) - the exact collision
-// this panel must avoid. `out` therefore uses a hardcoded bright yellow instead of a theme token.
+export function resolveTheme(theme: Plugin.Context["theme"]): Theme {
+  return {
+    primary: theme.hue.interactive[500],
+    secondary: theme.text.feedback.info.base,
+    accent: theme.hue.accent[500],
+    success: theme.text.feedback.success.base,
+    warning: theme.text.feedback.warning.base,
+    text: theme.text.base,
+    textMuted: theme.text.muted,
+    borderSubtle: theme.border.base,
+  }
+}
+
+// Preserve the recognizable output marker across host themes.
 const OUT_COLOR = RGBA.fromHex("#ffff00")
 
-// Final segment colours: `think` uses `secondary` (blue, hue ~215 deg), >=46 deg of hue from every
-// other panel colour; `out` uses the hardcoded `OUT_COLOR` (`#ffff00`, pure yellow, hue 60 deg),
-// whose tightest pairing is 36 deg against the overview bar's `used` (`primary`, ~24 deg).
 const SEGMENT_TOKEN = {
   cached: "success",
   prompt: "accent",
@@ -93,21 +82,22 @@ export function overviewToken(id: OverviewSegmentId): ThemeColorKey {
 }
 
 /** Resolves the context/output limits of the model that produced the last assistant turn. */
-function modelLimits(
-  providers: TuiPluginApi["state"]["provider"],
+export function modelLimits(
+  models: ReturnType<Plugin.Context["data"]["location"]["model"]["list"]>,
   providerID: string | undefined,
   modelID: string | undefined,
 ): UsageLimits | undefined {
   if (providerID === undefined || modelID === undefined) return undefined
-  const provider = providers.find((item) => item.id === providerID)
-  const model = provider?.models[modelID]
+  const model = models?.find((item) => item.providerID === providerID && item.id === modelID)
   if (model === undefined) return undefined
   return { context: model.limit.context, output: model.limit.output }
 }
 
 /** Computes the usage snapshot of the last assistant turn that carries output tokens. */
-function sessionUsage(api: TuiPluginApi, assistant: AssistantUsage, config: ResolvedOptions): Usage {
-  const limits = modelLimits(api.state.provider, assistant.providerID, assistant.modelID)
+function sessionUsage(context: Plugin.Context, sessionID: string, assistant: AssistantUsage, config: ResolvedOptions): Usage {
+  const session = context.data.session.get(sessionID)
+  const models = session === undefined ? undefined : context.data.location.model.list(session.location)
+  const limits = modelLimits(models, assistant.providerID, assistant.modelID)
   return computeUsage({
     tokens: assistant.tokens,
     ...(limits === undefined ? {} : { limits }),
@@ -205,22 +195,32 @@ function legendRow(cells: readonly LegendCell[], eff: number, muted: ThemeColor)
   )
 }
 
-/** Builds the panel element tree for one usage snapshot. Deliberately a plain function: the slot body
- *  calls it directly, so every slot re-run rebuilds the tree and re-reads the session data. */
-export function renderPanel(api: TuiPluginApi, sessionId: string, config: ResolvedOptions) {
-  const theme = api.theme.current
-  const messages = api.state.session.messages(sessionId)
-  const assistant = lastAssistantWithTokens(messages)
-  const usage = assistant === undefined ? undefined : sessionUsage(api, assistant, config)
-  const eff = effectiveWidth()
-  const percentText = usage === undefined ? undefined : `${formatPercent(usage.percent)} used`
-  const title = titleRung(eff, percentText ?? "")
+/** Each mounted sidebar owns its measurement; Solid tracks the V2 data and theme stores. */
+export function ContextPanel(props: { context: Plugin.Context; sessionID: string; config: ResolvedOptions }) {
+  const [panelWidth, setPanelWidth] = createSignal(props.config.barWidth)
+  let panelBox: BoxRenderable | undefined
+  const syncPanelWidth = () => {
+    const width = panelBox?.width
+    if (typeof width === "number" && Number.isFinite(width) && width > 0) setPanelWidth(width)
+  }
+  onMount(syncPanelWidth)
+  const theme = () => resolveTheme(props.context.theme)
+  const usage = createMemo(() => {
+    const session = props.context.data.session.get(props.sessionID)
+    const messages = props.context.data.session.message.list(props.sessionID)
+    const assistant = lastAssistantWithTokens(messages, session?.revert?.messageID)
+    return assistant === undefined ? undefined : sessionUsage(props.context, props.sessionID, assistant, props.config)
+  })
+  const eff = () => effectiveWidth(panelWidth())
+  const percentText = () => usage() === undefined ? "" : `${formatPercent(usage()!.percent)} used`
+  const title = () => titleRung(eff(), percentText())
   return (
     <box
+      id="opencode-tui-context-panel"
       flexDirection="column"
       gap={1}
       border
-      borderColor={theme.borderSubtle}
+      borderColor={theme().borderSubtle}
       paddingLeft={1}
       paddingRight={1}
       ref={(element) => {
@@ -231,57 +231,57 @@ export function renderPanel(api: TuiPluginApi, sessionId: string, config: Resolv
       }}
     >
       <box flexDirection="row" justifyContent="space-between">
-        {title === "none" ? null : (
-          <text fg={theme.text}>
+        {title() === "none" ? null : (
+          <text fg={theme().text}>
             <b>{TITLE_LABEL}</b>
           </text>
         )}
-        {title === "both" && percentText !== undefined ? (
-          <text fg={theme[overviewToken("used")]}>{percentText}</text>
+        {title() === "both" && percentText() ? (
+          <text fg={theme()[overviewToken("used")]}>{percentText()}</text>
         ) : null}
       </box>
-      {usage === undefined ? (
-        <text fg={theme.textMuted}>no assistant turns yet</text>
-      ) : (
+      <Show when={usage()} fallback={<text fg={theme().textMuted}>no usage snapshot yet</text>}>
+        {(snapshot: Accessor<Usage>) => (
         <box flexDirection="column" gap={1}>
           <box flexDirection="row">
-            {overviewBarEntries(usage, config, eff).map((entry) => (
-              <text fg={theme[overviewToken(entry.id)]}>
+            {overviewBarEntries(snapshot(), props.config, eff()).map((entry) => (
+              <text fg={theme()[overviewToken(entry.id)]}>
                 {(entry.id === "free" ? BAR_EMPTY : BAR_FILLED).repeat(entry.cells)}
               </text>
             ))}
           </box>
           <box flexDirection="row">
-            {compositionBarEntries(usage, config, eff).map((entry) => (
-              <text fg={segmentColor(entry.id, theme)}>{BAR_FILLED.repeat(entry.cells)}</text>
+            {compositionBarEntries(snapshot(), props.config, eff()).map((entry) => (
+              <text fg={segmentColor(entry.id, theme())}>{BAR_FILLED.repeat(entry.cells)}</text>
             ))}
           </box>
-          {config.showLegend
+          {props.config.showLegend
             ? legendRow(
-                overviewLegendItems(usage, config).map((item) => ({
+                overviewLegendItems(snapshot(), props.config).map((item) => ({
                   letter: item.letter,
                   label: item.label,
                   marker: item.id === "free" ? BAR_EMPTY : BAR_FILLED,
-                  color: theme[overviewToken(item.id)],
+                  color: theme()[overviewToken(item.id)],
                 })),
-                eff,
-                theme.textMuted,
+                eff(),
+                theme().textMuted,
               )
             : null}
-          {config.showLegend
+          {props.config.showLegend
             ? legendRow(
-                compositionLegendItems(usage, config).map((item) => ({
+                compositionLegendItems(snapshot(), props.config).map((item) => ({
                   letter: item.letter,
                   label: item.label,
                   marker: BAR_FILLED,
-                  color: segmentColor(item.id, theme),
+                  color: segmentColor(item.id, theme()),
                 })),
-                eff,
-                theme.textMuted,
+                eff(),
+                theme().textMuted,
               )
             : null}
         </box>
-      )}
+        )}
+      </Show>
     </box>
   )
 }

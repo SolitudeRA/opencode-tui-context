@@ -3,7 +3,7 @@
 **See context usage and token composition at a glance in the OpenCode sidebar.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/SolitudeRA/opencode-tui-context/blob/main/LICENSE)
-[![OpenCode: >=1.18.0](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.0-18181b)](#quick-start)
+[![OpenCode: V2](https://img.shields.io/badge/OpenCode-V2-18181b)](#quick-start)
 
 English · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.zh-CN.md) · [日本語](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.ja.md)
 
@@ -17,19 +17,19 @@ English · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blo
 
 ## Quick start
 
-Requires **OpenCode `>=1.18.0`**. Installation and activation have been verified on **Windows with OpenCode `1.18.31`**.
+This checkout targets **OpenCode V2 (`>=2.0.32 <3`)**. **Plugin `2.0.0` is not published yet**; use the [source installation](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#install-from-source) to try it locally. V1 users should keep `opencode-tui-context@1.0.1` and use the [V1 guide](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md).
+
+After `2.0.0` is published:
 
 ```sh
-opencode plugin -g opencode-tui-context
+opencode plugin add opencode-tui-context@2.0.0
 ```
 
-OpenCode downloads the prebuilt plugin and adds it to the global `tui.json`; no local build is needed.
+OpenCode downloads the prebuilt plugin and adds it to the global **`cli.json`**; no local build is needed. See the [V2 installation guide](https://opencode.ai/v2/docs/cli/commands/#plugin).
 
-Restart OpenCode, open a session, and show the sidebar. The **Context** panel displays usage after an assistant response reports positive output tokens. Until then, it shows `no assistant turns yet`.
+Restart OpenCode, open a session, and show the sidebar. The **Context** panel displays the latest assistant message with positive output tokens in the active context. Until then, it shows `no usage snapshot yet`.
 
-- For a project-only installation, omit `-g`.
-- For ZIP/source installation or migration from a local copy, see the [user guide](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#quick-start).
-- Seeing two Context panels? Follow the [built-in panel instructions](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#show-the-panel).
+Local copies need `package.json`, the root `tui.js`, and `dist/tui.js`. See the [user guide](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#quick-start) for installation, V1 migration, and sidebar settings.
 
 ## Reading the panel
 
@@ -46,18 +46,21 @@ Restart OpenCode, open a session, and show the sidebar. The **Context** panel di
 | Composition | `t` | `think` | Reasoning tokens |
 | Composition | `o` | `out` | Output tokens |
 
-The panel reflects the **latest assistant message reporting positive output tokens**. It is not cumulative session usage or an exact count of the next prompt.
+The panel reflects the **latest assistant message reporting positive output tokens in the active context**. It is not cumulative session usage or an exact count of the next prompt.
 
 See the [user guide](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#reading-the-panel) for segment meanings and calculation details.
 
 ## Optional configuration
 
-The defaults work without additional configuration. To hide the legends, edit the existing plugin entry in **`tui.json`** (not `opencode.json`):
+The defaults work without additional configuration. To hide the legends, edit the existing plugin entry in **`cli.json`**:
 
 ```json
 {
-  "plugin": [
-    ["opencode-tui-context", { "showLegend": false }]
+  "plugins": [
+    {
+      "package": "opencode-tui-context@2.0.0",
+      "options": { "showLegend": false }
+    }
   ]
 }
 ```

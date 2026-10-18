@@ -1,6 +1,6 @@
 {
   "name": "opencode-tui-context",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "type": "module",
   "license": "MIT",
   "description": "OpenCode TUI plugin that renders session context-window usage as a segmented bar in the sidebar",
@@ -28,6 +28,7 @@
   },
   "files": [
     "dist",
+    "tui.js",
     "docs/assets/context-preview.svg"
   ],
   "publishConfig": {
@@ -35,24 +36,25 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "opencode": ">=1.18.0"
+    "opencode": ">=2.0.32 <3"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "test:render": "npm run build && bun --conditions=browser scripts/test-render.mjs",
     "release:pack": "node scripts/release.mjs",
     "prepack": "npm run build",
-    "prepublishOnly": "npm run typecheck && bun test"
+    "prepublishOnly": "npm run typecheck && bun test && npm run test:render"
   },
   "peerDependencies": {
-    "@opencode-ai/plugin": ">=1.18.0",
-    "@opentui/core": ">=0.4.5",
-    "@opentui/solid": ">=0.4.5",
-    "solid-js": ">=1.9.0"
+    "@opencode/plugin": ">=2.0.32 <3",
+    "@opentui/core": ">=0.5.17 <0.6",
+    "@opentui/solid": ">=0.5.17 <0.6",
+    "solid-js": ">=1.9.15 <2"
   },
   "peerDependenciesMeta": {
-    "@opencode-ai/plugin": {
+    "@opencode/plugin": {
       "optional": true
     },
     "@opentui/core": {
@@ -66,14 +68,18 @@
     }
   },
   "devDependencies": {
-    "@opencode-ai/plugin": "1.18.31",
-    "@opentui/core": "0.4.5",
-    "@opentui/solid": "0.4.5",
+    "@babel/core": "7.28.0",
+    "@babel/preset-typescript": "7.27.1",
+    "babel-preset-solid": "1.9.12",
+    "@opencode/plugin": "2.0.32",
+    "@opencode/theme": "2.0.32",
+    "@opentui/core": "0.5.17",
+    "@opentui/solid": "0.5.17",
     "@types/bun": "^1.4.2",
     "@types/node": "24.12.2",
     "esbuild": "^0.25.0",
     "fflate": "0.8.3",
-    "solid-js": "1.9.12",
+    "solid-js": "1.9.15",
     "typescript": "5.8.2"
   }
 }

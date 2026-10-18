@@ -3,7 +3,7 @@
 **OpenCode のサイドバーで、コンテキスト使用量とトークンの内訳をひと目で確認。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/SolitudeRA/opencode-tui-context/blob/main/LICENSE)
-[![OpenCode: >=1.18.0](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.0-18181b)](#クイックスタート)
+[![OpenCode: V2](https://img.shields.io/badge/OpenCode-V2-18181b)](#クイックスタート)
 
 [English](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.md) · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.zh-CN.md) · 日本語
 
@@ -17,21 +17,21 @@
 
 ## クイックスタート
 
-**OpenCode `>=1.18.0`** が必要です。Windows の `1.18.31` で実際のインストールと有効化を確認しています。
+このソースは **OpenCode V2（`>=2.0.32 <3`）** 向けです。**プラグイン `2.0.0` は未公開**のため、試す場合は[ソースからインストール](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#ソースからインストール)してください。V1 ユーザーは `opencode-tui-context@1.0.1` に固定し、[V1 ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)を参照してください。
+
+`2.0.0` の公開後に実行します。
 
 ```sh
-opencode plugin -g opencode-tui-context
+opencode plugin add opencode-tui-context@2.0.0
 ```
 
-OpenCode がビルド済みパッケージをダウンロードし、グローバルの **`tui.json`** に追加します。
-ローカルでのビルドや追加の認証情報は不要です。現在のプロジェクトだけにインストールする場合は `-g` を省略します。
+OpenCode がビルド済みパッケージを取得し、グローバルの **`cli.json`** に登録します。ローカルのビルドは不要です。[V2 のインストールコマンド](https://opencode.ai/v2/docs/cli/commands/#plugin)も参照してください。
 
 OpenCode を再起動し、セッションを開いてサイドバーを表示してください。
-正の出力トークン数を報告したアシスタントの応答があれば、**Context** パネルに使用量が表示されます。
-それまでは `no assistant turns yet` と表示されます。
+現在有効なコンテキスト内で正の出力トークン数を持つ最新のアシスタントメッセージを **Context** パネルに表示します。
+それまでは `no usage snapshot yet` と表示されます。
 
-ZIP・ソースからのインストールは[利用ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#クイックスタート)を参照してください。
-**Context が 2 つ表示される場合**は、[内蔵パネルの無効化と有効状態の確認](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#パネルを表示する)を参照してください。
+ローカル版には `package.json`、ルートの `tui.js`、`dist/tui.js` が必要です。インストール、V1 からの移行、サイドバーの設定は[利用ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#クイックスタート)を参照してください。
 
 ## パネルの見方
 
@@ -49,19 +49,22 @@ ZIP・ソースからのインストールは[利用ガイド](https://github.co
 | 内訳 | `o` | `out` | 出力トークン |
 
 `reserved` はモデルの出力上限をもとにした表示用の推定値で、実際にトークンを予約するものではありません。
-表示するのは **正の出力トークン数を持つ最新のアシスタントメッセージのスナップショット** です。セッション全体の累積使用量や請求額、次のプロンプトの正確なトークン数ではありません。
+表示するのは **現在有効なコンテキスト内で正の出力トークン数を持つ最新のアシスタントメッセージのスナップショット** です。セッション全体の累積使用量や請求額、次のプロンプトの正確なトークン数ではありません。
 
 各項目の定義や計算式は[使用量の計算方法](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#使用量の計算方法)にまとめています。
 
 ## オプション設定
 
-既定の設定でそのまま使えます。凡例を非表示にしたい場合は、`tui.json` の既存のエントリーを次の形式に変更してください。
+既定の設定でそのまま使えます。凡例を非表示にしたい場合は、`cli.json` の既存のエントリーを次の形式に変更してください。
 他の設定やプラグインは残し、同じプラグインを重複して追加しないでください。バージョンを固定している場合は `@version` も残します。
 
 ```json
 {
-  "plugin": [
-    ["opencode-tui-context", { "showLegend": false }]
+  "plugins": [
+    {
+      "package": "opencode-tui-context@2.0.0",
+      "options": { "showLegend": false }
+    }
   ]
 }
 ```

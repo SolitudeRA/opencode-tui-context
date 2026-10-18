@@ -41,6 +41,8 @@ jobs:
         run: bun run typecheck
       - name: Run tests
         run: bun test
+      - name: Verify the compiled sidebar in OpenTUI
+        run: bun run test:render
       - name: Build and verify release archives
         run: npm run release:pack
       - name: Save installable archives

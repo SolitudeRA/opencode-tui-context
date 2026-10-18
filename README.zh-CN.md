@@ -3,7 +3,7 @@
 **在 OpenCode 侧边栏，一眼看清上下文占用与 token 构成。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/SolitudeRA/opencode-tui-context/blob/main/LICENSE)
-[![OpenCode: >=1.18.0](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.0-18181b)](#快速开始)
+[![OpenCode: V2](https://img.shields.io/badge/OpenCode-V2-18181b)](#快速开始)
 
 [English](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.md) · 简体中文 · [日本語](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.ja.md)
 
@@ -17,17 +17,19 @@
 
 ## 快速开始
 
-需要 **OpenCode `>=1.18.0`**；已在 Windows 上使用 **`1.18.31`** 验证真实安装与插件启用。
+当前源码面向 **OpenCode V2（`>=2.0.32 <3`）**。**插件 `2.0.0` 尚未发布**，可先[从源码安装](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#从源码安装)体验。V1 用户请固定使用 `opencode-tui-context@1.0.1`，并参考 [V1 指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)。
+
+`2.0.0` 发布后运行：
 
 ```sh
-opencode plugin -g opencode-tui-context
+opencode plugin add opencode-tui-context@2.0.0
 ```
 
-OpenCode 会下载预构建包，并自动写入全局 `tui.json`，无需本地编译。仅为当前项目安装时，省略 `-g`。
+OpenCode 会下载预构建包并写入全局 **`cli.json`**，无需本地编译。详见 [V2 安装命令](https://opencode.ai/v2/docs/cli/commands/#plugin)。
 
-重启 OpenCode，打开会话侧边栏。收到报告正数输出 token 的 assistant 回复后，**Context** 面板即可显示用量；此前显示 `no assistant turns yet`。
+重启 OpenCode，打开会话侧边栏。**Context** 面板显示当前有效上下文内最近一条报告正数输出 token 的 assistant 消息；此前显示 `no usage snapshot yet`。
 
-其他安装方式见[使用指南](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#安装)。若出现两个 Context 面板，可按[显示面板](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#显示面板)中的说明停用内置面板。
+本地安装需保留 `package.json`、根目录 `tui.js` 和 `dist/tui.js`。安装、V1 迁移和侧栏设置见[使用指南](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#安装)。
 
 ## 读懂面板
 
@@ -46,21 +48,24 @@ OpenCode 会下载预构建包，并自动写入全局 `tui.json`，无需本地
 
 `reserved` 只是基于模型输出上限的显示估算，不会实际预留 token，也不表示自动压缩阈值。
 
-面板反映的是**最近一条报告正数输出 token 的 assistant 消息快照**，并非整个会话的累计账单，也不是下一次提示词的精确计数。完整口径见[用量如何计算](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#用量如何计算)。
+面板反映的是**当前有效上下文内最近一条报告正数输出 token 的 assistant 消息快照**，并非整个会话的累计账单，也不是下一次提示词的精确计数。完整口径见[用量如何计算](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#用量如何计算)。
 
 ## 可选配置
 
-默认配置即可使用。需要隐藏图例时，在 **`tui.json`** 中把已有插件条目改为：
+默认配置即可使用。需要隐藏图例时，在 **`cli.json`** 中把已有插件条目改为：
 
 ```json
 {
-  "plugin": [
-    ["opencode-tui-context", { "showLegend": false }]
+  "plugins": [
+    {
+      "package": "opencode-tui-context@2.0.0",
+      "options": { "showLegend": false }
+    }
   ]
 }
 ```
 
-请保留其他设置和插件；若已有条目带有固定版本后缀（如 `@1.0.1`），也请保留。修改原条目即可，不要重复添加。
+请保留其他设置、插件和目标 V2 版本后缀。修改原条目即可，不要重复添加。
 
 | 选项 | 默认值 | 作用 |
 | --- | --- | --- |

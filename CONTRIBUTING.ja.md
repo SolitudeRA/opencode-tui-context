@@ -10,13 +10,13 @@
 
 ## 開発環境と確認
 
-開発には Git、Bun、Node.js を使います。リポジトリをクローンした後に実行してください。
+開発には Git、Bun、Node.js を使い、ホスト検証には OpenCode `2.0.32` を使います。V2 SDK は `package.json` でバージョンを固定しています。リポジトリをクローンした後に実行してください。
 
 ```sh
 bun install --frozen-lockfile
 bun run typecheck
 bun test
-bun run build
+bun run test:render
 ```
 
 npm パッケージ、ビルド済み ZIP、チェックサムをローカルで生成するには：
@@ -27,22 +27,26 @@ npm run release:pack
 
 成果物は `release/` に出力されます。このコマンドは公開を行いません。初回の npm 設定、自動公開、ホストへのインストール確認については[リリースガイド](docs/releasing.md)を参照してください。
 
-テストでは、オプションの正規化、使用量の計算、バーのセル割り当て、配色、凡例、狭い幅での動作を検証します。OpenCode 内でのスモークテストも必要です。UI を変更した後は、空のセッション、トークンデータを持つ応答、狭いサイドバー、他のプラグインとの併用を確認してください。
+単体テストはオプション、使用量、有効なコンテキスト、セル割り当て、配色、凡例、狭い幅を検証します。`test:render` は `dist/tui.js` を再ビルドし、V2 ホスト Context のモックと実際の OpenTUI テストレンダラーで実行します。9 グループのシナリオで、空の状態、トークン更新、メッセージのモデル参照、セッション・ロケーション切り替え、巻き戻し境界、コンパクション、幅変更、テーマ変更、終了処理を確認します。ネットワーク通信も OpenCode の起動も行いません。
+
+ホストの受け入れ確認では、OpenCode 内でも同じシナリオを確認してください。正確なホストバージョンを記録し、ローカルのテストデータと実際のプロバイダー使用量を区別します。描画の契約テストだけでは、ホストのプラグイン読み込みや npm インストールは確認できません。
 
 ## ソースコードの構成
 
 | ファイル | 役割 |
 | --- | --- |
-| [`src/tui.tsx`](src/tui.tsx) | プラグインモジュールと ID（`opencode-tui-context`） |
-| [`src/plugin.tsx`](src/plugin.tsx) | イベント購読と、順序 `60` での `sidebar_content` 登録 |
+| [`tui.js`](tui.js) | ローカルディレクトリの入口として `dist/tui.js` を読み込む |
+| [`src/tui.tsx`](src/tui.tsx) | V2 `Plugin.define()` エントリーと ID（`opencode-tui-context`） |
+| [`src/plugin.tsx`](src/plugin.tsx) | オプションと `sidebar.content` スロットの登録・解除 |
 | [`src/panel.tsx`](src/panel.tsx) | テーマの配色、モデルの参照、幅に応じた描画 |
 | [`src/usage.ts`](src/usage.ts) | メッセージの選択と使用量の計算 |
 | [`src/format.ts`](src/format.ts) | 数値の省略表記と文字セルの割り当て |
 | [`src/options.ts`](src/options.ts) | 設定の既定値と検証 |
-| [`scripts/build.mjs`](scripts/build.mjs) | esbuild による ESM バンドルの生成 |
+| [`scripts/build.mjs`](scripts/build.mjs) | Babel で Solid JSX をコンパイルし、esbuild で ESM をバンドル |
+| [`scripts/test-render.mjs`](scripts/test-render.mjs) | 実際の OpenTUI テストレンダラーでビルド済みバンドルの 9 グループを検証 |
 | [`scripts/release.mjs`](scripts/release.mjs) | npm パッケージ、ビルド済み ZIP、SHA-256 チェックサムの生成と検証 |
 
-バンドルでは OpenTUI と Solid のインポートを外部参照として残し、ホストが提供するモジュールを使います。マニフェストには省略可能な peer dependencies を宣言し、実行時の `dependencies` はありません。インストール先に開発用依存関係をコピーする必要はありません。
+バンドルでは `@opencode/plugin/tui`、OpenTUI、Solid を外部参照として残し、V2 ホストのモジュールを使います。省略可能な peer dependencies を宣言し、実行時の `dependencies` はありません。開発用依存関係のコピーは不要です。ローカル版には `package.json`、ルートの `tui.js`、`dist/tui.js` が必要で、npm はマニフェストの `./tui` エクスポートを使います。Solid JSX の変換は維持してください。汎用の JSX 変換では、コンパイルが成功してもリアクティブな描画が壊れる場合があります。
 
 ## 変更の提案
 

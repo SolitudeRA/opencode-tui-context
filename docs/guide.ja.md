@@ -15,26 +15,29 @@
 
 ### 前提条件
 
-- **OpenCode `>=1.18.0`**。[package.json](../package.json) で宣言している要件です。開発用 SDK は `1.18.31` に固定していますが、それ以降のすべてのホストバージョンで動作確認済みという意味ではありません。
-- 以下の標準インストールコマンドは **OpenCode `1.18.31`** に照らして確認しています。古いバージョンでは `opencode plugin --help` を確認するか、OpenCode を更新してください。
-- npm とビルド済み ZIP のインストールにはローカルでのビルドは不要です。ソースからのインストールにのみ **Git、[Bun](https://bun.sh/)、[Node.js](https://nodejs.org/)** が必要です。
+- **OpenCode `>=2.0.32 <3`** と、本プラグインの `2.x` ソースが必要です。開発 SDK は `@opencode/plugin@2.0.32` に固定しています。宣言した範囲の全バージョンで動作確認済みという意味ではありません。[package.json](../package.json) を参照してください。
+- **`2.0.0` は未公開です。** ローカルで試す場合はソースからインストールしてください。npm と ZIP の手順は V2 リリースの公開後に使えます。
+- V1 ユーザーは **`opencode-tui-context@1.0.1`** に固定し、[V1 README](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)を参照してください。V2 のバンドルは V1 では読み込めません。
+- ソースからのインストールには **Git、[Bun](https://bun.sh/)、[Node.js](https://nodejs.org/)** が必要です。公開済みの npm パッケージと ZIP はビルド不要です。
 
-### npm からインストール（推奨）
+### npm からインストール
+
+`2.0.0` の公開後に実行します。
 
 ```sh
-opencode plugin -g opencode-tui-context
+opencode plugin add opencode-tui-context@2.0.0
 ```
 
-OpenCode がビルド済みパッケージをダウンロードし、グローバルの `tui.json` に追加します。OpenCode を再起動すると読み込まれます。現在のプロジェクトだけにインストールする場合は `-g` を省略します。コマンドパレットから **Install plugin** を選び、`opencode-tui-context` を入力してグローバルスコープを選択することもできます。ホストの[インストールガイド](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)を参照してください。
+CLI 専用パッケージをグローバルの `cli.json` に追加します。OpenCode V2 の CLI 設定はグローバルのみで、プロジェクト単位の `cli.json` はありません。[プラグインのコマンド](https://opencode.ai/v2/docs/cli/commands/#plugin)と [CLI 設定](https://opencode.ai/v2/docs/cli/config/)も参照してください。
 
-ローカルインストールから移行する場合は、`tui.json` の古いパスエントリーを削除し、プラグインの重複を避けてください。
+V1 から移行する場合は、`tui.json` から本プラグインの旧エントリーを削除して `cli.json` に V2 エントリーを追加します。`[package, options]` のタプルは[オブジェクト形式](#設定)へ変換してください。他の設定とプラグインは残し、ローカル版と npm 版を重複して読み込まないでください。
 
 ### 代替方法：ビルド済み ZIP
 
 リリースにはビルド済み ZIP が含まれています。npm が利用できない環境ではこちらを使えます。
 
 1. [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases) を開き、**Assets** から `opencode-tui-context-<version>.zip` をダウンロードします。GitHub が自動生成する **Source code** アーカイブはビルドが必要です。
-2. アーカイブ内の `opencode-tui-context` ディレクトリを、`tui.json` と同じ場所にある `local-plugins/` に展開します。既定のグローバル設定では `~/.config/opencode/local-plugins/`（Windows は `$HOME\.config\opencode\local-plugins\`）です。`package.json` と `dist/tui.js` をそのまま保ってください。
+2. アーカイブ内の `opencode-tui-context` ディレクトリを、`cli.json` と同じ場所にある `local-plugins/` に展開します。既定のグローバル設定では `~/.config/opencode/local-plugins/`（Windows は `$HOME\.config\opencode\local-plugins\`）です。`package.json`、ルートの `tui.js`、`dist/tui.js` をそのまま保ってください。
 3. 下記の[ローカルプラグイン設定](#ローカルインストールを有効にする)を追加し、OpenCode を再起動します。
 
 ### ソースからインストール
@@ -48,7 +51,7 @@ bun install --frozen-lockfile
 bun run build
 ```
 
-ビルドすると `dist/tui.js` が生成されます。
+ビルドすると `dist/tui.js` が生成されます。ローカル版では、リポジトリのルートにある `tui.js` がこのバンドルを読み込みます。
 
 リポジトリのルートで、ビルド結果とマニフェストをグローバルのプラグインディレクトリへコピーします。
 
@@ -56,7 +59,7 @@ bun run build
 
 ```sh
 mkdir -p "$HOME/.config/opencode/local-plugins/opencode-tui-context"
-cp -R dist package.json "$HOME/.config/opencode/local-plugins/opencode-tui-context/"
+cp -R dist package.json tui.js "$HOME/.config/opencode/local-plugins/opencode-tui-context/"
 ```
 
 **Windows PowerShell**
@@ -64,45 +67,36 @@ cp -R dist package.json "$HOME/.config/opencode/local-plugins/opencode-tui-conte
 ```powershell
 $pluginDir = Join-Path $HOME ".config/opencode/local-plugins/opencode-tui-context"
 New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
-Copy-Item -Path dist, package.json -Destination $pluginDir -Recurse -Force
+Copy-Item -Path dist, package.json, tui.js -Destination $pluginDir -Recurse -Force
 ```
 
 ### ローカルインストールを有効にする
 
-ZIP またはソースからインストールした場合は、既存の設定やプラグインを残したまま、`~/.config/opencode/tui.json`（Windows では `$HOME\.config\opencode\tui.json`）に次のエントリーを追加します。
+他の設定とプラグインを残して、グローバルの `cli.json` に次のエントリーを追加します。既定の場所は `~/.config/opencode/cli.json`（Windows では `$HOME\.config\opencode\cli.json`）です。`$XDG_CONFIG_HOME` が設定されている場合は `~/.config` の代わりに使われます。
 
 ```json
 {
-  "plugin": ["./local-plugins/opencode-tui-context"]
+  "plugins": ["./local-plugins/opencode-tui-context"]
 }
 ```
 
-次の構成を保ってください。マニフェストの `./tui` エクスポートは `dist/tui.js` を参照します。コピー先にソースファイルや `node_modules` は不要です。
+次の 3 ファイルをすべて残してください。ローカルディレクトリの読み込みにはルートの `tui.js` が必要で、npm ではマニフェストの `./tui` エクスポートを使います。どちらも同じ `dist/tui.js` を読み込みます。コピー先にソースや `node_modules` は不要です。
 
 ```text
 local-plugins/opencode-tui-context/
 ├── package.json
+├── tui.js
 └── dist/
     └── tui.js
 ```
 
-パスは `tui.json` があるディレクトリを基準とした相対パスです。設定ファイルを別の場所に置いている場合は、コピー先を調整するか、プラグインの絶対パスを指定してください。Windows の JSON 内でも `D:/Codeing/opencode-tui-context` のようにスラッシュを使えます。JSON のプラグインエントリーには `~/...` を使わないでください。`1.18.31` のローダーは `~` を展開しません。ホストの[設定パス解決処理](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/config/plugin.ts#L38-L54)と[プラグインパス判定処理](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/plugin/shared.ts#L158-L176)を参照してください。
+パスは `cli.json` があるディレクトリを基準にします。設定先が異なる場合はコピー先を合わせるか、絶対パスを使ってください。Windows の JSON では `D:/Codeing/opencode-tui-context` のようにスラッシュを使えます。プラグインのエントリーでは `~/...` を避け、完全なパスを指定してください。[CLI プラグイン設定](https://opencode.ai/v2/docs/cli/plugins/)も参照してください。
 
 ### パネルを表示する
 
-設定先は **`tui.json`** です。`opencode.json` のサーバープラグイン一覧には追加しません。OpenCode を再起動し、セッションを開いてサイドバーを表示してください。アシスタントメッセージに出力トークンが報告されると、**Context** パネルに使用量が表示されます。それまでは `no assistant turns yet` と表示されます。
+OpenCode を再起動してセッションを開きます。`cli.json` の `session.sidebar` を `"auto"` に設定し、サイドバーを表示できる幅のターミナルを使ってください。**Context** パネルは `sidebar.content` の末尾に追加され、ホストの既存のコンテンツと共存します。他のコンポーネントは置き換えません。
 
-OpenCode 内蔵のコンテキストパネルを置き換える場合は、次の設定も追加します。
-
-```json
-{
-  "plugin_enabled": {
-    "internal:sidebar-context": false
-  }
-}
-```
-
-両方のパネルが表示される場合は、OpenCode のプラグインマネージャーに保存された有効・無効の状態を確認してください。保存済みの状態が設定ファイルより優先される場合があります。他のサイドバープラグインは有効なままで構いません。有効状態の優先順位については、ホストの [TUI プラグインガイド](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md)を参照してください。
+現在有効なコンテキスト内で最新のアシスタント使用量を表示します。対象データがまだない場合や、コンパクション完了後に新しい使用量が報告されていない場合は、`no usage snapshot yet` と表示されます。V1 の `plugin_enabled` 設定は V2 では使いません。[サイドバーの設定](https://opencode.ai/v2/docs/cli/config/#sessions)も参照してください。
 
 ## パネルの見方
 
@@ -122,23 +116,23 @@ OpenCode 内蔵のコンテキストパネルを置き換える場合は、次�
 
 幅が狭くなると、各凡例グループはまず数値をマーカーの下に移し、さらに狭くなると数値を隠し、最後にグループ全体を隠します。タイトルはパーセント表示を先に隠し、その後に `Context` を隠します。サイドバーを広げると詳細が再び表示されます。
 
-ほとんどの色はホストテーマから取得します。対応は `used` → `primary`、`cached` → `success`、`prompt` → `accent`、`think` → `secondary`、`reserved` → `textMuted`、`free` → `text` です。出力には固定の黄色（`#ffff00`）を使うため、ライトテーマではコントラストが低くなる場合があります。
+配色の多くは V2 ホストテーマのインタラクティブ色、アクセント色、成功・情報テキスト、弱めたテキスト、基本テキストに従います。出力には固定の黄色（`#ffff00`）を使うため、ライトテーマではコントラストが低くなる場合があります。
 
 ## 設定
 
-npm からインストールした場合、`tui.json` のパッケージエントリーを `[package, options]` のタプルに置き換えます。既存のエントリーに `@version` があり、そのバージョンを維持したい場合は接尾辞を残してください。
+npm からインストールした場合は `cli.json` のオブジェクト形式を使います。バージョンを固定するには接尾辞を残してください。
 
 ```json
 {
-  "plugin": [
-    [
-      "opencode-tui-context",
-      {
+  "plugins": [
+    {
+      "package": "opencode-tui-context@2.0.0",
+      "options": {
         "barWidth": 24,
         "exclude": [],
         "showLegend": true
       }
-    ]
+    }
   ]
 }
 ```
@@ -159,7 +153,7 @@ ZIP またはソースからインストールした場合、この例のパッ�
 
 ## 使用量の計算方法
 
-プラグインは現在のセッションを末尾からたどり、数値の `tokens.output > 0` を持つ最新のアシスタントメッセージを探します。そのメッセージのトークン情報を読み取り、メッセージ自身の `providerID` / `modelID` に対応する上限を参照します。その後に別のモデルへ切り替えていても、測定対象のメッセージを生成したモデルを使います。
+プラグインは現在有効なコンテキストを末尾からたどり、数値の `tokens.output > 0` を持つ最新のアシスタントメッセージを探します。巻き戻したメッセージは対象外で、完了したコンパクションの境界より前には戻りません。コンパクション後は新しい使用量を待ち、それ以前の使用量やコンパクション要求自体のトークンは表示しません。上限はメッセージ自身の `model.providerID` / `model.id` で参照するため、その後モデルを切り替えても測定対象のモデルを使います。
 
 ```text
 used     = input + cacheRead + cacheWrite + reasoning + output
@@ -179,7 +173,7 @@ percent  = min(100, round(used / window × 100))
 
 各セグメントには、利用可能な文字セル数に対する割合を四捨五入し、残り幅を上限としてセルを割り当てます。トークン数が正でも丸め結果がゼロになるセグメントには、未割り当て分や幅の広いセグメントから余地を確保できる場合、最低 1 セルを割り当てます。全体バーは `free` が除外されていなければ残りのセルを `free` で埋めますが、内訳バーでは丸めによる隙間をそのまま残します。そのため、セルの幅はおおよその比率を示すもので、特に小さなセグメントでは誤差が目立つことがあります。
 
-プラグインは `message.updated`、`message.part.updated`、`session.updated`、`session.idle` を購読します。50 ms の先行エッジスロットルにより、その間に発生したイベントは無視されます。ポーリングや、間隔の終了後に再更新するタイマーはありません。プラグインの終了処理で購読を解除します。新しい応答の出力トークンが報告されるまでは、前のスナップショットが表示される場合があります。
+パネルは Solid を使い、V2 のセッション・メッセージ・モデル・テーマのキャッシュに反応して更新します。パネルごとに幅を測定し、ポーリングやイベントの間引きは行いません。プラグインが終了すると、ホストがスロットとリアクティブな計算を解除します。新しい応答に出力トークンが報告されるまでは、直前の対象スナップショットが表示される場合があります。
 
 </details>
 
@@ -187,27 +181,27 @@ percent  = min(100, round(used / window × 100))
 
 | 症状 | 確認すること |
 | --- | --- |
-| インストールコマンドが使えない | `opencode plugin --help` を確認してください。本ガイドの標準インストール手順は `1.18.31` に基づきます。OpenCode を更新するか、ローカルインストールを利用してください。 |
-| npm でパッケージが見つからない | パッケージ名、指定バージョン、レジストリへの接続を確認してください。npm が利用できない場合は、ビルド済み ZIP を使えます。 |
-| パネルが表示されない | OpenCode のバージョン、サイドバーの表示状態、`tui.json` のエントリー、プラグインマネージャーの有効状態を確認してください。ローカルインストールでは `package.json` + `dist/tui.js` の配置も確認します。変更後は再起動してください。 |
-| `no assistant turns yet` と表示される | 正の出力トークン数を報告したアシスタントメッセージがまだありません。出力トークン数がゼロのメッセージは対象になりません。 |
-| トークンは表示されるが全体バーが空 / `0% used` になる | 測定対象のメッセージを生成したモデルについて、正のコンテキスト上限を取得できていません。そのモデルのプロバイダーメタデータを確認してください。 |
-| サイドバーを狭くすると数値やパーセントが消える | 幅に収まらない詳細情報は自動で非表示になります。ターミナルまたはサイドバーを広げてください。`barWidth` で測定済みの幅を上書きすることはできません。 |
-| コンテキストパネルが 2 つ表示される | 内蔵の `internal:sidebar-context` パネル、または同じ情報を表示する別のプラグインを無効にしてください。`plugin_enabled` が効かないように見える場合は、プラグインマネージャーに保存された状態を確認します。 |
-| 請求用の合計や次のプロンプトの値と一致しない | 表示しているのは、報告済みの 1 つのアシスタントメッセージのスナップショットです。複数ターンの合計でも、請求額の計算でも、トークナイザーによる計測でもありません。 |
+| インストールコマンドが使えない | `opencode --version` と `opencode plugin --help` を確認してください。この版には V2 が必要です。V1 を使う場合はプラグイン `1.0.1` を維持してください。 |
+| npm で `2.0.0` が見つからない | まだ公開されていません。V2 の変更を含むソースを使い、V1 のパッケージで代用しないでください。 |
+| パネルが表示されない | ホストのバージョン、`cli.json` のエントリー、`session.sidebar: "auto"` を確認し、ターミナルを広げてください。ローカル版は `package.json` + ルートの `tui.js` + `dist/tui.js` の配置を確認して再起動します。 |
+| `no usage snapshot yet` と表示される | 正の出力トークンを持つ対象メッセージがありません。巻き戻したメッセージと、完了したコンパクションより前の使用量は対象外です。 |
+| トークンはあるが全体バーが空 / `0% used` になる | 対象メッセージを生成したモデルの正のコンテキスト上限を取得できていません。プロバイダーのメタデータを確認してください。 |
+| 狭いサイドバーで数値やパーセントが消える | 収まらない情報は自動で隠れます。幅を広げてください。`barWidth` で測定済みの幅は上書きできません。 |
+| 他のコンテキスト情報も表示される | このプラグインはパネルを追加します。ホストの内容や他のプラグインは無効にしません。 |
+| 請求用の合計や次のプロンプトの値と違う | 1 つのアシスタント使用量のスナップショットであり、累積の請求額やトークナイザーの計測値ではありません。 |
 
-解決しない場合は、OpenCode のバージョン、OS・ターミナル、プラグインのオプション、最小限の再現手順を添えて [Issue を作成](https://github.com/SolitudeRA/opencode-tui-context/issues)してください。表示上の問題には、機密情報を伏せたスクリーンショットも添えてください。
+解決しない場合は、OpenCode のバージョン、OS・ターミナル、オプション、最小限の再現手順を添えて [Issue を作成](https://github.com/SolitudeRA/opencode-tui-context/issues)してください。表示上の問題には、機密情報を伏せたスクリーンショットも添えてください。
 
 ## 更新と削除
 
-**npm：**`<version>` を公開済みのバージョンに置き換えて実行します。
+**npm：**`opencode plugin check` で更新を確認できます。公開済みの V2 バージョンに固定する場合は、`cli.json` 内の本プラグインの `package` 接尾辞だけを変更し、オプションを保って再起動します。更新コマンドの引数は `opencode plugin update --help` を参照してください。V1 ユーザーは `1.0.1` に固定してください。
+
+**ZIP：**`cli.json` のパスを変えず、インストール先を新しい V2 リリースに置き換えます。**ソース：**未変更のチェックアウトを更新し、ビルドとコピーを繰り返して OpenCode を再起動します。
+
+npm エントリーをグローバル設定から削除するには：
 
 ```sh
-opencode plugin -g "opencode-tui-context@<version>" --force
+opencode plugin remove opencode-tui-context
 ```
 
-プロジェクト単位のインストールでは `-g` を省略します。OpenCode `1.18.31` では、`--force` が設定内のパッケージバージョンを置き換え、タプルのオプションは維持します。明示したバージョンは固定され、パッケージ名だけの場合は `latest` に追従します。更新後は OpenCode を再起動してください。ホストの[更新動作の説明](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)を参照してください。
-
-**ZIP：**新しいビルド済みアセットをダウンロードし、`tui.json` のパスを変えずにインストール先ディレクトリを置き換えます。**ソース：**ローカルで変更していないチェックアウトで `git pull --ff-only` を実行し、ビルドとコピーの手順を繰り返します。完了後、OpenCode を再起動します。
-
-読み込みを停止するには、`tui.json` の `plugin` 配列からエントリーを削除し、再起動します。ローカルインストールの場合は、コピーした `local-plugins/opencode-tui-context` ディレクトリも削除できます。OpenCode `1.18.31` にプラグインのアンインストールコマンドはなく、設定を削除しても npm キャッシュは残ります。内蔵のコンテキストパネルを無効にしていた場合は、`plugin_enabled` またはプラグインマネージャーで再び有効にしてください。
+または `cli.json` の `plugins` 配列から本プラグインのエントリーを削除して再起動します。ローカル版はコピーした `local-plugins/opencode-tui-context` ディレクトリも削除できます。他のプラグインや OpenCode の設定は残してください。

@@ -21,6 +21,7 @@ const required = [
   "dist/tui.js",
   "docs/assets/context-preview.svg",
   "package.json",
+  "tui.js",
 ].sort();
 const outDir = path.join(root, "release");
 mkdirSync(outDir, { recursive: true });
@@ -63,8 +64,15 @@ try {
   assert.equal(shipped.name, manifest.name);
   assert.equal(shipped.version, manifest.version);
   assert.equal(shipped.exports?.["./tui"]?.import, "./dist/tui.js");
+  assert(files["tui.js"].toString("utf8").includes('export { default } from "./dist/tui.js"'),
+    "Local directory installs require the root TUI entry.");
   assert.equal(Object.keys(shipped.dependencies ?? {}).length, 0, "Unexpected runtime dependencies.");
+  assert.equal(shipped.peerDependencies?.["@opencode/plugin"], ">=2.0.32 <3");
+  assert(!shipped.peerDependencies?.["@opencode-ai/plugin"], "A V2 release must not require the V1 SDK.");
   assert(files["dist/tui.js"].length > 0, "The TUI entry is empty.");
+  const entry = files["dist/tui.js"].toString("utf8");
+  assert(entry.includes('from "@opencode/plugin/tui"'), "The bundle must use the V2 TUI runtime.");
+  assert(!entry.includes("@opencode-ai/plugin"), "The bundle still contains a V1 import.");
 
   const zipFiles = Object.fromEntries(required.map((file) => [`${manifest.name}/${file}`, files[file]]));
   // ZIP stores local calendar fields, so use a fixed local date on every platform.

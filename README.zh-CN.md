@@ -20,7 +20,7 @@
 需要 **OpenCode V2（`>=2.0.32 <3`）**。V1 用户请固定使用 `opencode-tui-context@1.0.1`，并参考 [V1 指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)。
 
 ```sh
-opencode plugin add opencode-tui-context@2.0.0
+opencode plugin add opencode-tui-context@2.0.1
 ```
 
 OpenCode 会下载预构建包并写入全局 **`cli.json`**，无需本地编译。详见 [V2 安装命令](https://opencode.ai/v2/docs/cli/commands/#plugin)。
@@ -56,7 +56,7 @@ OpenCode 会下载预构建包并写入全局 **`cli.json`**，无需本地编�
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.0.0",
+      "package": "opencode-tui-context@2.0.1",
       "options": { "showLegend": false }
     }
   ]

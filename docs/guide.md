@@ -17,7 +17,7 @@ Installation alternatives, configuration, usage calculations, and troubleshootin
 ### Install from npm
 
 ```sh
-opencode plugin add opencode-tui-context@2.0.0
+opencode plugin add opencode-tui-context@2.0.1
 ```
 
 This installs the CLI-only package into the global `cli.json`. OpenCode V2 uses a single global CLI configuration; there is no project-local `cli.json`. See the host's [plugin commands](https://opencode.ai/v2/docs/cli/commands/#plugin) and [CLI settings](https://opencode.ai/v2/docs/cli/config/).
@@ -118,7 +118,7 @@ For npm installations, use the object form in `cli.json`. Keep the version suffi
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.0.0",
+      "package": "opencode-tui-context@2.0.1",
       "options": {
         "barWidth": 24,
         "exclude": [],

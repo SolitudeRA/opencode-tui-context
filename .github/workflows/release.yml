@@ -126,7 +126,7 @@ jobs:
           NODE
       - name: Publish to npm using OIDC
         if: steps.registry.outputs.publish == 'true'
-        run: npm publish "release/opencode-tui-context-${RELEASE_VERSION}.tgz" --access public --tag latest --ignore-scripts --registry=https://registry.npmjs.org
+        run: npm publish "./release/opencode-tui-context-${RELEASE_VERSION}.tgz" --access public --tag latest --ignore-scripts --registry=https://registry.npmjs.org
 
   github-release:
     name: Publish GitHub Release downloads

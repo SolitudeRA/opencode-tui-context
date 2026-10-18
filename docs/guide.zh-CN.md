@@ -17,7 +17,7 @@
 ### npm 安装
 
 ```sh
-opencode plugin add opencode-tui-context@2.0.0
+opencode plugin add opencode-tui-context@2.0.1
 ```
 
 此命令将纯 CLI 插件写入全局 `cli.json`。OpenCode V2 只有全局 CLI 配置，不支持项目级 `cli.json`。详见宿主的[插件命令](https://opencode.ai/v2/docs/cli/commands/#plugin)和 [CLI 设置](https://opencode.ai/v2/docs/cli/config/)。
@@ -118,7 +118,7 @@ npm 安装时，在 `cli.json` 中使用对象形式。保留版本后缀即可�
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.0.0",
+      "package": "opencode-tui-context@2.0.1",
       "options": {
         "barWidth": 24,
         "exclude": [],

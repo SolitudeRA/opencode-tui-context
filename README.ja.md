@@ -20,7 +20,7 @@
 **OpenCode V2（`>=2.0.32 <3`）** が必要です。V1 ユーザーは `opencode-tui-context@1.0.1` に固定し、[V1 ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)を参照してください。
 
 ```sh
-opencode plugin add opencode-tui-context@2.0.0
+opencode plugin add opencode-tui-context@2.0.1
 ```
 
 OpenCode がビルド済みパッケージを取得し、グローバルの **`cli.json`** に登録します。ローカルのビルドは不要です。[V2 のインストールコマンド](https://opencode.ai/v2/docs/cli/commands/#plugin)も参照してください。
@@ -60,7 +60,7 @@ OpenCode を再起動し、セッションを開いてサイドバーを表示�
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.0.0",
+      "package": "opencode-tui-context@2.0.1",
       "options": { "showLegend": false }
     }
   ]

@@ -2,52 +2,41 @@
 
 [README に戻る](README.ja.md) · [English](CONTRIBUTING.md) · [简体中文](CONTRIBUTING.zh-CN.md) · 日本語
 
-開発環境の準備、動作確認、プルリクエストの方針をまとめています。インストールや設定については[利用ガイド](docs/guide.ja.md)を参照してください。
-
-- [開発環境と確認](#開発環境と確認)
-- [ソースコードの構成](#ソースコードの構成)
-- [変更の提案](#変更の提案)
-
 ## 開発環境と確認
 
-開発には Git、Bun、Node.js を使い、ホスト検証には OpenCode `2.0.32` を使います。V2 SDK は `package.json` でバージョンを固定しています。リポジトリをクローンした後に実行してください。
+開発には Git、Bun、Node.js を使います。ホスト検証の基準は OpenCode V1 `1.18.31` と V2 `2.0.32` で、SDK バージョンは `package.json` に固定しています。クローン後に実行してください。
 
 ```sh
 bun install --frozen-lockfile
 bun run typecheck
 bun test
 bun run test:render
-```
-
-npm パッケージ、ビルド済み ZIP、チェックサムをローカルで生成するには：
-
-```sh
 npm run release:pack
 ```
 
-成果物は `release/` に出力されます。このコマンドは公開を行いません。初回の npm 設定、自動公開、ホストへのインストール確認については[リリースガイド](docs/releasing.md)を参照してください。
+`release:pack` は npm パッケージ、ZIP、チェックサムを `release/` に出力し、公開は行いません。公開とホスト検証については[リリースガイド](docs/releasing.md)を参照してください。
 
-単体テストはオプション、使用量、有効なコンテキスト、セル割り当て、配色、凡例、狭い幅を検証します。`test:render` は `dist/tui.js` を再ビルドし、V2 ホスト Context のモックと実際の OpenTUI テストレンダラーで実行します。9 グループのシナリオで、空の状態、トークン更新、メッセージのモデル参照、セッション・ロケーション切り替え、巻き戻し境界、コンパクション、幅変更、テーマ変更、終了処理を確認します。ネットワーク通信も OpenCode の起動も行いません。
-
-ホストの受け入れ確認では、OpenCode 内でも同じシナリオを確認してください。正確なホストバージョンを記録し、ローカルのテストデータと実際のプロバイダー使用量を区別します。描画の契約テストだけでは、ホストのプラグイン読み込みや npm インストールは確認できません。
+単体テストは設定、使用量、両 API の有効なコンテキスト選択、イベント解除、幅に応じた描画を検証します。`test:render` は 3 つのバンドルをビルドし、入口の遅延読み込みと、各バージョンに対応する実際の OpenTUI テストレンダラーで両アダプターを確認します。ホスト Context はモックです。モデル呼び出しや OpenCode の起動は行わないため、実際のホスト読み込みや npm インストールは両ホストで別途確認し、テストデータと実際のプロバイダー使用量を区別してください。
 
 ## ソースコードの構成
 
 | ファイル | 役割 |
 | --- | --- |
-| [`tui.js`](tui.js) | ローカルディレクトリの入口として `dist/tui.js` を読み込む |
-| [`src/tui.tsx`](src/tui.tsx) | V2 `Plugin.define()` エントリーと ID（`opencode-tui-context`） |
-| [`src/plugin.tsx`](src/plugin.tsx) | オプションと `sidebar.content` スロットの登録・解除 |
-| [`src/panel.tsx`](src/panel.tsx) | テーマの配色、モデルの参照、幅に応じた描画 |
-| [`src/usage.ts`](src/usage.ts) | メッセージの選択と使用量の計算 |
-| [`src/format.ts`](src/format.ts) | 数値の省略表記と文字セルの割り当て |
-| [`src/options.ts`](src/options.ts) | 設定の既定値と検証 |
-| [`scripts/build.mjs`](scripts/build.mjs) | Babel で Solid JSX をコンパイルし、esbuild で ESM をバンドル |
-| [`scripts/test-render.mjs`](scripts/test-render.mjs) | 実際の OpenTUI テストレンダラーでビルド済みバンドルの 9 グループを検証 |
-| [`scripts/release.mjs`](scripts/release.mjs) | npm パッケージ、ビルド済み ZIP、SHA-256 チェックサムの生成と検証 |
+| [`tui.js`](tui.js) | ローカルディレクトリ読み込みの入口 |
+| [`src/tui.tsx`](src/tui.tsx) | 共通入口。V1 `tui` または V2 `setup` アダプターを遅延読み込み |
+| [`src/tui-v1.tsx`](src/tui-v1.tsx)、[`src/v1/plugin.tsx`](src/v1/plugin.tsx) | V1 モジュール、状態・イベント、テーマ、`sidebar_content` の登録 |
+| [`src/tui-v2.tsx`](src/tui-v2.tsx)、[`src/plugin.tsx`](src/plugin.tsx) | V2 `Plugin.define()`、オプション、`sidebar.content` の登録 |
+| [`src/panel.tsx`](src/panel.tsx) | 共通の描画と V2 のデータ・テーマ変換 |
+| [`src/usage.ts`](src/usage.ts)、[`src/v1/usage.ts`](src/v1/usage.ts) | 共通の計算とホスト別のメッセージ・モデル選択 |
+| [`src/v1/refresh.ts`](src/v1/refresh.ts) | V1 イベントの購読と解除 |
+| [`src/format.ts`](src/format.ts)、[`src/options.ts`](src/options.ts) | セル割り当て、数値の省略表記、設定の検証 |
+| [`scripts/build.mjs`](scripts/build.mjs) | Solid JSX の変換と固定名の 3 つの ESM バンドル |
+| [`scripts/test-entrypoints.mjs`](scripts/test-entrypoints.mjs) | 入口の遅延読み込みと依存関係の分離を検証 |
+| [`scripts/test-render.mjs`](scripts/test-render.mjs)、[`scripts/test-render-v1.mjs`](scripts/test-render-v1.mjs) | V2・V1 のネイティブレンダラーによる契約検証 |
+| [`scripts/release.mjs`](scripts/release.mjs) | アーカイブ内容、エクスポート、チェックサムの検証 |
 
-バンドルでは `@opencode/plugin/tui`、OpenTUI、Solid を外部参照として残し、V2 ホストのモジュールを使います。省略可能な peer dependencies を宣言し、実行時の `dependencies` はありません。開発用依存関係のコピーは不要です。ローカル版には `package.json`、ルートの `tui.js`、`dist/tui.js` が必要で、npm はマニフェストの `./tui` エクスポートを使います。Solid JSX の変換は維持してください。汎用の JSX 変換では、コンパイルが成功してもリアクティブな描画が壊れる場合があります。
+共通入口には SDK やレンダラーの実行時インポートを置かず、各ホストが自身のアダプターだけを読み込むようにします。V2 は `@opencode/plugin/tui` と `Plugin.define()`、V1 は旧モジュール契約を使います。OpenTUI と Solid は外部参照のままホストから提供されます。省略可能な peer dependencies で互換性を宣言し、実行時 `dependencies` や開発用依存関係のコピーは不要です。
 
-## 変更の提案
+ローカル版には `package.json`、ルートの `tui.js`、`dist/` 内の `tui.js`・`tui-v1.js`・`tui-v2.js` が必要です。Solid JSX の変換は維持してください。汎用の JSX 変換では、コンパイルが成功してもリアクティブな描画が壊れる場合があります。
 
-コントリビューションを歓迎します。変更の範囲を絞り、上記のチェックを実行したうえで、プルリクエストにはユーザーから見える動作と検証内容を記載してください。動作を変更する場合は関連するテストを更新し、英語・中国語・日本語の README、[利用ガイド](docs/guide.ja.md)、コントリビューションガイドを揃えてください。大きなスコープ変更は、先に Issue で相談してください。
+変更の範囲を絞り、上記のチェックを実行し、プルリクエストにユーザーから見える動作と検証結果を記載してください。動作の変更時は関連テストを更新し、英語・中国語・日本語の README、利用ガイド、コントリビューションガイドを揃えてください。大きなスコープ変更は、先に Issue で相談してください。

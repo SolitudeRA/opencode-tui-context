@@ -3,7 +3,7 @@
 **在 OpenCode 侧边栏，一眼看清上下文占用与 token 构成。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/SolitudeRA/opencode-tui-context/blob/main/LICENSE)
-[![OpenCode: V2](https://img.shields.io/badge/OpenCode-V2-18181b)](#快速开始)
+[![OpenCode: V1 + V2](https://img.shields.io/badge/OpenCode-V1%20%2B%20V2-18181b)](#快速开始)
 
 [English](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.md) · 简体中文 · [日本語](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.ja.md)
 
@@ -17,17 +17,16 @@
 
 ## 快速开始
 
-需要 **OpenCode V2（`>=2.0.32 <3`）**。V1 用户请固定使用 `opencode-tui-context@1.0.1`，并参考 [V1 指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)。
+**同一个插件版本同时支持 OpenCode V1 和 V2。** 先运行 `opencode --version`，再选择对应命令：
 
-```sh
-opencode plugin add opencode-tui-context@2.0.1
-```
+| OpenCode | 安装 `2.1.0` | 全局配置 |
+| --- | --- | --- |
+| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.0` | `tui.json` → `plugin` |
+| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.0` | `cli.json` → `plugins` |
 
-OpenCode 会下载预构建包并写入全局 **`cli.json`**，无需本地编译。详见 [V2 安装命令](https://opencode.ai/v2/docs/cli/commands/#plugin)。
+OpenCode 会下载预构建包，无需本地构建或手动选择适配器。重启 OpenCode 并打开会话侧边栏。**Context** 面板显示当前有效上下文内最近一份报告正数输出 token 的 assistant 用量；此前显示 `no usage snapshot yet`。
 
-重启 OpenCode，打开会话侧边栏。**Context** 面板显示当前有效上下文内最近一条报告正数输出 token 的 assistant 消息；此前显示 `no usage snapshot yet`。
-
-本地安装需保留 `package.json`、根目录 `tui.js` 和 `dist/tui.js`。安装、V1 迁移和侧栏设置见[使用指南](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#安装)。
+ZIP／源码安装、升级和侧栏设置见[使用指南](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#安装)。
 
 ## 读懂面板
 
@@ -50,20 +49,7 @@ OpenCode 会下载预构建包并写入全局 **`cli.json`**，无需本地编�
 
 ## 可选配置
 
-默认配置即可使用。需要隐藏图例时，在 **`cli.json`** 中把已有插件条目改为：
-
-```json
-{
-  "plugins": [
-    {
-      "package": "opencode-tui-context@2.0.1",
-      "options": { "showLegend": false }
-    }
-  ]
-}
-```
-
-请保留其他设置、插件和目标 V2 版本后缀。修改原条目即可，不要重复添加。
+默认配置即可使用。两个宿主版本支持相同选项，配置格式有所不同。请参照 [V1／V2 配置示例](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#配置)修改已有条目，并保留其他设置和插件。
 
 | 选项 | 默认值 | 作用 |
 | --- | --- | --- |

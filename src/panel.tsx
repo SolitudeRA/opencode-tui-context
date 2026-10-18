@@ -16,7 +16,7 @@ export function effectiveWidth(width: number): number {
 }
 
 export type ResolvedOptions = Required<PluginOptions_>
-/** Small palette resolved from V2 semantic tokens, shared by bars and their legends. */
+/** Flat host-independent palette shared by bars and their legends. */
 export type Theme = Record<"primary" | "secondary" | "accent" | "success" | "warning" | "text" | "textMuted" | "borderSubtle", RGBA>
 export type ThemeColorKey = keyof Theme
 export type ThemeColor = RGBA
@@ -195,8 +195,19 @@ function legendRow(cells: readonly LegendCell[], eff: number, muted: ThemeColor)
   )
 }
 
-/** Each mounted sidebar owns its measurement; Solid tracks the V2 data and theme stores. */
+/** V2 adapter: normalize the host's session, model, and theme stores for the view. */
 export function ContextPanel(props: { context: Plugin.Context; sessionID: string; config: ResolvedOptions }) {
+  const usage = createMemo(() => {
+    const session = props.context.data.session.get(props.sessionID)
+    const messages = props.context.data.session.message.list(props.sessionID)
+    const assistant = lastAssistantWithTokens(messages, session?.revert?.messageID)
+    return assistant === undefined ? undefined : sessionUsage(props.context, props.sessionID, assistant, props.config)
+  })
+  return <UsagePanel usage={usage()} theme={resolveTheme(props.context.theme)} config={props.config} />
+}
+
+/** Both adapters render this view; each mounted sidebar owns its measurement. */
+export function UsagePanel(props: { usage: Usage | undefined; theme: Theme; config: ResolvedOptions }) {
   const [panelWidth, setPanelWidth] = createSignal(props.config.barWidth)
   let panelBox: BoxRenderable | undefined
   const syncPanelWidth = () => {
@@ -204,13 +215,8 @@ export function ContextPanel(props: { context: Plugin.Context; sessionID: string
     if (typeof width === "number" && Number.isFinite(width) && width > 0) setPanelWidth(width)
   }
   onMount(syncPanelWidth)
-  const theme = () => resolveTheme(props.context.theme)
-  const usage = createMemo(() => {
-    const session = props.context.data.session.get(props.sessionID)
-    const messages = props.context.data.session.message.list(props.sessionID)
-    const assistant = lastAssistantWithTokens(messages, session?.revert?.messageID)
-    return assistant === undefined ? undefined : sessionUsage(props.context, props.sessionID, assistant, props.config)
-  })
+  const theme = () => props.theme
+  const usage = () => props.usage
   const eff = () => effectiveWidth(panelWidth())
   const percentText = () => usage() === undefined ? "" : `${formatPercent(usage()!.percent)} used`
   const title = () => titleRung(eff(), percentText())

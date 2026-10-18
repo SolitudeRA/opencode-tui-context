@@ -3,7 +3,7 @@
 **See context usage and token composition at a glance in the OpenCode sidebar.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/SolitudeRA/opencode-tui-context/blob/main/LICENSE)
-[![OpenCode: V2](https://img.shields.io/badge/OpenCode-V2-18181b)](#quick-start)
+[![OpenCode: V1 + V2](https://img.shields.io/badge/OpenCode-V1%20%2B%20V2-18181b)](#quick-start)
 
 English · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.zh-CN.md) · [日本語](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.ja.md)
 
@@ -17,17 +17,16 @@ English · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blo
 
 ## Quick start
 
-Requires **OpenCode V2 (`>=2.0.32 <3`)**. V1 users should keep `opencode-tui-context@1.0.1` and use the [V1 guide](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md).
+**One package version supports OpenCode V1 and V2.** Check `opencode --version`, then use the matching command:
 
-```sh
-opencode plugin add opencode-tui-context@2.0.1
-```
+| OpenCode | Install `2.1.0` | Global configuration |
+| --- | --- | --- |
+| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.0` | `tui.json` → `plugin` |
+| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.0` | `cli.json` → `plugins` |
 
-OpenCode downloads the prebuilt plugin and adds it to the global **`cli.json`**; no local build is needed. See the [V2 installation guide](https://opencode.ai/v2/docs/cli/commands/#plugin).
+OpenCode downloads the prebuilt package; no local build or manual adapter selection is needed. Restart OpenCode, open a session, and show the sidebar. The **Context** panel displays the latest assistant usage with positive output tokens in the active context; until then, it shows `no usage snapshot yet`.
 
-Restart OpenCode, open a session, and show the sidebar. The **Context** panel displays the latest assistant message with positive output tokens in the active context. Until then, it shows `no usage snapshot yet`.
-
-Local copies need `package.json`, the root `tui.js`, and `dist/tui.js`. See the [user guide](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#quick-start) for installation, V1 migration, and sidebar settings.
+See the [user guide](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#quick-start) for ZIP/source installation, upgrades, and sidebar settings.
 
 ## Reading the panel
 
@@ -50,20 +49,7 @@ See the [user guide](https://github.com/SolitudeRA/opencode-tui-context/blob/mai
 
 ## Optional configuration
 
-The defaults work without additional configuration. To hide the legends, edit the existing plugin entry in **`cli.json`**:
-
-```json
-{
-  "plugins": [
-    {
-      "package": "opencode-tui-context@2.0.1",
-      "options": { "showLegend": false }
-    }
-  ]
-}
-```
-
-Keep your other settings and plugins. Preserve an existing `@version` suffix if you want to stay on that version; edit the entry rather than adding a second copy.
+The defaults work without additional configuration. Both host versions accept the same options; their configuration formats differ. Use the [V1/V2 examples](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#configuration) to edit the existing entry and preserve other settings and plugins.
 
 | Option | Default | Purpose |
 | --- | --- | --- |

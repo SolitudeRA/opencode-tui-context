@@ -3,7 +3,7 @@
 **OpenCode のサイドバーで、コンテキスト使用量とトークンの内訳をひと目で確認。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/SolitudeRA/opencode-tui-context/blob/main/LICENSE)
-[![OpenCode: V2](https://img.shields.io/badge/OpenCode-V2-18181b)](#クイックスタート)
+[![OpenCode: V1 + V2](https://img.shields.io/badge/OpenCode-V1%20%2B%20V2-18181b)](#クイックスタート)
 
 [English](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.md) · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blob/main/README.zh-CN.md) · 日本語
 
@@ -17,19 +17,16 @@
 
 ## クイックスタート
 
-**OpenCode V2（`>=2.0.32 <3`）** が必要です。V1 ユーザーは `opencode-tui-context@1.0.1` に固定し、[V1 ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)を参照してください。
+**同じパッケージバージョンで OpenCode V1 と V2 に対応します。** `opencode --version` を確認し、対応するコマンドを実行してください。
 
-```sh
-opencode plugin add opencode-tui-context@2.0.1
-```
+| OpenCode | `2.1.0` のインストール | グローバル設定 |
+| --- | --- | --- |
+| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.0` | `tui.json` → `plugin` |
+| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.0` | `cli.json` → `plugins` |
 
-OpenCode がビルド済みパッケージを取得し、グローバルの **`cli.json`** に登録します。ローカルのビルドは不要です。[V2 のインストールコマンド](https://opencode.ai/v2/docs/cli/commands/#plugin)も参照してください。
+OpenCode がビルド済みパッケージを取得します。ローカルのビルドやアダプターの選択は不要です。再起動してセッションのサイドバーを表示すると、**Context** パネルに現在有効なコンテキスト内で正の出力トークン数を持つ最新の使用量が表示されます。それまでは `no usage snapshot yet` と表示されます。
 
-OpenCode を再起動し、セッションを開いてサイドバーを表示してください。
-現在有効なコンテキスト内で正の出力トークン数を持つ最新のアシスタントメッセージを **Context** パネルに表示します。
-それまでは `no usage snapshot yet` と表示されます。
-
-ローカル版には `package.json`、ルートの `tui.js`、`dist/tui.js` が必要です。インストール、V1 からの移行、サイドバーの設定は[利用ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#クイックスタート)を参照してください。
+ZIP・ソースからのインストール、更新、サイドバーの設定は[利用ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#クイックスタート)を参照してください。
 
 ## パネルの見方
 
@@ -53,19 +50,7 @@ OpenCode を再起動し、セッションを開いてサイドバーを表示�
 
 ## オプション設定
 
-既定の設定でそのまま使えます。凡例を非表示にしたい場合は、`cli.json` の既存のエントリーを次の形式に変更してください。
-他の設定やプラグインは残し、同じプラグインを重複して追加しないでください。バージョンを固定している場合は `@version` も残します。
-
-```json
-{
-  "plugins": [
-    {
-      "package": "opencode-tui-context@2.0.1",
-      "options": { "showLegend": false }
-    }
-  ]
-}
-```
+既定の設定でそのまま使えます。両バージョンで使えるオプションは同じですが、設定形式が異なります。[V1・V2 の設定例](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#設定)に従って既存のエントリーを編集し、他の設定やプラグインは残してください。
 
 | オプション | 既定値 | 動作 |
 | --- | --- | --- |

@@ -22,6 +22,9 @@ assert.equal(manifest.exports?.["./tui"]?.import, "./dist/tui.js")
 const bundle = await readFile(path.join(input, "dist", "tui.js"))
 assert(bundle.length > 0)
 const bundleSha256 = createHash("sha256").update(bundle).digest("hex")
+const bundles = Object.fromEntries(await Promise.all(["tui.js", "tui-v1.js", "tui-v2.js"].map(async (name) => [
+  name, createHash("sha256").update(await readFile(path.join(input, "dist", name))).digest("hex"),
+])))
 async function checkPackage(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     assert(!entry.isSymbolicLink(), `Release must not contain symbolic links: ${entry.name}`)
@@ -132,7 +135,7 @@ export default Plugin.define({
   id: "opencode-tui-context-host-observer",
   setup(context) {
     let cancelled = false
-    const evidence = { hostVersion: context.app.version, packageVersion: ${JSON.stringify(manifest.version)}, bundleSha256: ${JSON.stringify(bundleSha256)}, cases: [], scope: "Real V2 package loading, synthetic session rendering, resize and plugin configuration reload; no model request" }
+    const evidence = { hostVersion: context.app.version, packageVersion: ${JSON.stringify(manifest.version)}, bundleSha256: ${JSON.stringify(bundleSha256)}, bundles: ${JSON.stringify(bundles)}, cases: [], scope: "Real V2 package loading, synthetic session rendering, resize and plugin configuration reload; no model request" }
     const run = async () => {
       await wait(1000)
       context.renderer.resize(160, 48)

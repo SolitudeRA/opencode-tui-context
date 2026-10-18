@@ -19,6 +19,8 @@ const required = [
   "README.md",
   "README.zh-CN.md",
   "dist/tui.js",
+  "dist/tui-v1.js",
+  "dist/tui-v2.js",
   "docs/assets/context-preview.svg",
   "package.json",
   "tui.js",
@@ -67,12 +69,28 @@ try {
   assert(files["tui.js"].toString("utf8").includes('export { default } from "./dist/tui.js"'),
     "Local directory installs require the root TUI entry.");
   assert.equal(Object.keys(shipped.dependencies ?? {}).length, 0, "Unexpected runtime dependencies.");
+  assert.equal(shipped.engines?.opencode, ">=1.18.31 <2 || >=2.0.32 <3");
   assert.equal(shipped.peerDependencies?.["@opencode/plugin"], ">=2.0.32 <3");
-  assert(!shipped.peerDependencies?.["@opencode-ai/plugin"], "A V2 release must not require the V1 SDK.");
-  assert(files["dist/tui.js"].length > 0, "The TUI entry is empty.");
+  assert.equal(shipped.peerDependencies?.["@opencode-ai/plugin"], ">=1.18.31 <2");
+  for (const sdk of ["@opencode-ai/plugin", "@opencode/plugin"]) {
+    assert.equal(shipped.peerDependenciesMeta?.[sdk]?.optional, true,
+      "Installing for one host must not require the other host's SDK.");
+  }
+  for (const file of ["dist/tui.js", "dist/tui-v1.js", "dist/tui-v2.js"]) {
+    assert(files[file].length > 0, `The bundle is empty: ${file}`);
+  }
   const entry = files["dist/tui.js"].toString("utf8");
-  assert(entry.includes('from "@opencode/plugin/tui"'), "The bundle must use the V2 TUI runtime.");
-  assert(!entry.includes("@opencode-ai/plugin"), "The bundle still contains a V1 import.");
+  assert.match(entry, /\bimport\(["']\.\/tui-v1\.js["']\)/,
+    "The universal entry must load the V1 adapter lazily.");
+  assert.match(entry, /\bimport\(["']\.\/tui-v2\.js["']\)/,
+    "The universal entry must load the V2 adapter lazily.");
+  assert(!/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["'](?:@opencode(?:-ai)?\/|@opentui\/|solid-js)/.test(entry),
+    "The universal entry must not import a host runtime.");
+  const v1 = files["dist/tui-v1.js"].toString("utf8");
+  const v2 = files["dist/tui-v2.js"].toString("utf8");
+  assert(v2.includes('from "@opencode/plugin/tui"'), "The V2 adapter must use the V2 TUI runtime.");
+  assert(!v2.includes("@opencode-ai/plugin"), "The V2 adapter must not import the V1 SDK.");
+  assert(!v1.includes("@opencode/plugin"), "The V1 adapter must not import the V2 SDK.");
 
   const zipFiles = Object.fromEntries(required.map((file) => [`${manifest.name}/${file}`, files[file]]));
   // ZIP stores local calendar fields, so use a fixed local date on every platform.

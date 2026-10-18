@@ -10,26 +10,26 @@ Installation alternatives, configuration, usage calculations, and troubleshootin
 
 ### Requirements
 
-- **OpenCode `>=1.18.0`**, as declared in [package.json](../package.json). The development SDK is pinned to `1.18.31`; this is not a guarantee that every later host version has been tested.
-- The native installation commands below were checked against **OpenCode `1.18.31`**. On older versions, check `opencode plugin --help` or upgrade.
-- npm and prebuilt ZIP installations require no local build. Only source installation needs **Git, [Bun](https://bun.sh/), and [Node.js](https://nodejs.org/)**.
+- **OpenCode `>=2.0.32 <3`** and plugin version `2.x`. The development SDK is pinned to `@opencode/plugin@2.0.32`; the declared range does not mean every host version has been tested. See [package.json](../package.json).
+- V1 users should pin **`opencode-tui-context@1.0.1`** and follow the [V1 README](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md). The V2 bundle does not load in V1.
+- Source installation needs **Git, [Bun](https://bun.sh/), and [Node.js](https://nodejs.org/)**. Published npm and ZIP packages do not need a local build.
 
-### Install from npm (recommended)
+### Install from npm
 
 ```sh
-opencode plugin -g opencode-tui-context
+opencode plugin add opencode-tui-context@2.0.0
 ```
 
-OpenCode downloads the prebuilt package and adds it to the global `tui.json`. Restart OpenCode to load it. To install only for the current project, omit `-g`. You can also choose **Install plugin** in the command palette, enter `opencode-tui-context`, and select global scope. See the host's [installation guide](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install).
+This installs the CLI-only package into the global `cli.json`. OpenCode V2 uses a single global CLI configuration; there is no project-local `cli.json`. See the host's [plugin commands](https://opencode.ai/v2/docs/cli/commands/#plugin) and [CLI settings](https://opencode.ai/v2/docs/cli/config/).
 
-If migrating from a local installation, remove its old path entry from `tui.json` so the plugin is listed only once.
+When migrating from V1, remove the old entry for this plugin from `tui.json`, then add the V2 entry to `cli.json`. Convert any `[package, options]` tuple to the [object form](#configuration). Keep unrelated settings and plugins. Avoid loading both a local copy and the npm package.
 
 ### Alternative: prebuilt ZIP
 
 Releases include a prebuilt ZIP for installation when npm is unavailable:
 
 1. Open [Releases](https://github.com/SolitudeRA/opencode-tui-context/releases) and download `opencode-tui-context-<version>.zip` from **Assets**. GitHub's **Source code** archives still require a build.
-2. Extract the included `opencode-tui-context` directory into `local-plugins/` beside your `tui.json`. The default global location is `~/.config/opencode/local-plugins/` (`$HOME\.config\opencode\local-plugins\` on Windows). Keep `package.json` and `dist/tui.js` together.
+2. Extract the included `opencode-tui-context` directory into `local-plugins/` beside your `cli.json`. The default global location is `~/.config/opencode/local-plugins/` (`$HOME\.config\opencode\local-plugins\` on Windows). Keep `package.json`, the root `tui.js`, and `dist/tui.js` together.
 3. Add the [local plugin entry](#enable-a-local-installation) below, then restart OpenCode.
 
 ### Install from source
@@ -43,7 +43,7 @@ bun install --frozen-lockfile
 bun run build
 ```
 
-The build produces `dist/tui.js`.
+The build produces `dist/tui.js`; the repository's root `tui.js` loads that bundle for local installations.
 
 From the repository root, copy the build and manifest to the global plugin directory.
 
@@ -51,7 +51,7 @@ From the repository root, copy the build and manifest to the global plugin direc
 
 ```sh
 mkdir -p "$HOME/.config/opencode/local-plugins/opencode-tui-context"
-cp -R dist package.json "$HOME/.config/opencode/local-plugins/opencode-tui-context/"
+cp -R dist package.json tui.js "$HOME/.config/opencode/local-plugins/opencode-tui-context/"
 ```
 
 **Windows PowerShell**
@@ -59,45 +59,36 @@ cp -R dist package.json "$HOME/.config/opencode/local-plugins/opencode-tui-conte
 ```powershell
 $pluginDir = Join-Path $HOME ".config/opencode/local-plugins/opencode-tui-context"
 New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
-Copy-Item -Path dist, package.json -Destination $pluginDir -Recurse -Force
+Copy-Item -Path dist, package.json, tui.js -Destination $pluginDir -Recurse -Force
 ```
 
 ### Enable a local installation
 
-For ZIP or source installations, merge this entry into `~/.config/opencode/tui.json` (`$HOME\.config\opencode\tui.json` on Windows), preserving your other settings and plugins:
+Merge this entry into the global `cli.json`, keeping your other settings and plugins. The default location is `~/.config/opencode/cli.json` (`$HOME\.config\opencode\cli.json` on Windows); when set, `$XDG_CONFIG_HOME` replaces `~/.config`.
 
 ```json
 {
-  "plugin": ["./local-plugins/opencode-tui-context"]
+  "plugins": ["./local-plugins/opencode-tui-context"]
 }
 ```
 
-Keep this layout: the manifest's `./tui` export points to `dist/tui.js`. Source files and `node_modules` are not needed in the destination.
+Keep all three files below. Local directory loading needs the root `tui.js`; npm loading uses the manifest's `./tui` export. Both load the same `dist/tui.js` bundle. Source files and `node_modules` are not needed in the destination.
 
 ```text
 local-plugins/opencode-tui-context/
 ├── package.json
+├── tui.js
 └── dist/
     └── tui.js
 ```
 
-The path is relative to the directory containing `tui.json`. If you use a custom config location, adjust the copy destination or use an absolute plugin path; Windows JSON paths can use forward slashes, such as `D:/Codeing/opencode-tui-context`. Avoid `~/...` inside the JSON plugin entry: the `1.18.31` loader does not expand it. See the host's [config path resolver](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/config/plugin.ts#L38-L54) and [plugin path detection](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/src/plugin/shared.ts#L158-L176).
+The path is relative to `cli.json`. For a custom config location, adjust the copy destination or use an absolute path. Windows JSON paths can use forward slashes, for example `D:/Codeing/opencode-tui-context`. Use a complete path instead of `~/...` in the plugin entry. See [CLI plugin configuration](https://opencode.ai/v2/docs/cli/plugins/).
 
 ### Show the panel
 
-Use **`tui.json`**, rather than the server plugin list in `opencode.json`. Restart OpenCode, open a session, and show the sidebar. After an assistant message reports output tokens, the **Context** panel displays its usage; until then it shows `no assistant turns yet`.
+Restart OpenCode and open a session. Set `session.sidebar` to `"auto"` in `cli.json` and use a terminal wide enough for the sidebar. The **Context** panel appears at the end of `sidebar.content`, alongside the host's existing content. It does not replace other sidebar components.
 
-To replace OpenCode's built-in context panel, also merge this setting:
-
-```json
-{
-  "plugin_enabled": {
-    "internal:sidebar-context": false
-  }
-}
-```
-
-If both panels remain visible, check the saved enable/disable state in OpenCode's plugin manager; it can override the config setting. Other sidebar plugins can remain enabled. See the host's [TUI plugin guide](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md) for enable-state precedence.
+The panel shows the latest assistant usage within the active context. Before that data is available, and immediately after a completed compaction with no newer assistant usage, it shows `no usage snapshot yet`. V1's `plugin_enabled` setting is not used in V2. See the host's [sidebar settings](https://opencode.ai/v2/docs/cli/config/#sessions).
 
 ## Reading the panel
 
@@ -117,23 +108,23 @@ The title shows `used / window` as a rounded percentage. Legend counts use compa
 
 When space is tight, each legend group moves its counts below the markers, then hides the counts, then hides the group. The title drops the percentage before hiding `Context`. Widening the sidebar restores the details.
 
-Most colors come from the host theme: `used` → `primary`, `cached` → `success`, `prompt` → `accent`, `think` → `secondary`, `reserved` → `textMuted`, and `free` → `text`. Output uses fixed yellow (`#ffff00`), which may have lower contrast on light themes.
+Most colors follow the V2 host theme: interactive and accent hues, success and information text, muted text, and base text. Output uses fixed yellow (`#ffff00`), which may have lower contrast on light themes.
 
 ## Configuration
 
-For npm installations, replace the package entry in `tui.json` with a `[package, options]` tuple. Keep an existing `@version` suffix if you want to stay on that version:
+For npm installations, use the object form in `cli.json`. Keep the version suffix to stay on that release:
 
 ```json
 {
-  "plugin": [
-    [
-      "opencode-tui-context",
-      {
+  "plugins": [
+    {
+      "package": "opencode-tui-context@2.0.0",
+      "options": {
         "barWidth": 24,
         "exclude": [],
         "showLegend": true
       }
-    ]
+    }
   ]
 }
 ```
@@ -154,7 +145,7 @@ Restart OpenCode after changing the configuration or replacing the built plugin.
 
 ## How usage is calculated
 
-The plugin scans the current session backwards for the newest assistant message with numeric `tokens.output > 0`. It reads that message's token fields and looks up the limits of its own `providerID` / `modelID`, even if you have since selected a different model.
+The plugin scans the active session context backwards for the newest assistant message with numeric `tokens.output > 0`. It ignores reverted messages and does not cross a completed compaction boundary. After compaction, the panel waits for a new assistant usage snapshot instead of displaying the previous context's usage or the compaction request's tokens. It looks up the limits for that message's `model.providerID` / `model.id`, even if you have since selected a different model.
 
 ```text
 used     = input + cacheRead + cacheWrite + reasoning + output
@@ -174,7 +165,7 @@ Missing or invalid token counts become zero. The plugin sums these fields itself
 
 Each segment receives a rounded share of the available character cells, capped by the remaining width. A positive segment that rounds to zero receives a one-cell minimum when space can be taken from the remainder or a wider segment. The overview fills its remaining cells with `free` unless excluded; the composition leaves rounding gaps unfilled. Cell widths are therefore approximate, especially for tiny segments.
 
-The plugin listens to `message.updated`, `message.part.updated`, `session.updated`, and `session.idle`. A 50 ms leading-edge throttle drops events inside that interval; there is no polling or trailing refresh timer. Subscriptions are removed when the plugin is disposed. A new response may keep showing the previous snapshot until it reports output tokens.
+The panel reacts to OpenCode V2's cached session, message, model, and theme data through Solid. Each mounted panel measures its own width; there is no polling or event throttle. The host removes the slot and its reactive computations when the plugin unloads. A new response may keep showing the previous eligible snapshot until it reports output tokens.
 
 </details>
 
@@ -182,27 +173,26 @@ The plugin listens to `message.updated`, `message.part.updated`, `session.update
 
 | Symptom | What to check |
 | --- | --- |
-| Installation command is unavailable | Check `opencode plugin --help`; the native install flow is documented here for `1.18.31`. Upgrade OpenCode or use a local installation. |
-| npm cannot find the package | Check the package name, requested version, and registry access. If npm is unavailable, use the prebuilt ZIP. |
-| No panel appears | Check the OpenCode version, the visible sidebar, the `tui.json` entry, and the plugin manager's enable state. For local installations, also check the `package.json` + `dist/tui.js` layout. Restart OpenCode after changes. |
-| `no assistant turns yet` | No assistant message has reported positive output tokens yet. An existing message with zero output does not qualify. |
-| Tokens appear but the overview is empty / `0% used` | The plugin could not find a positive context limit for the model that produced the measured message. Check that model's provider metadata. |
-| Counts or percentage disappear in a narrow sidebar | The responsive layout hides details that do not fit. Widen the terminal/sidebar; `barWidth` does not override the measured width. |
-| Two context panels appear | Disable the built-in `internal:sidebar-context` panel or another plugin providing the same information. Check the plugin manager's saved state if `plugin_enabled` seems ineffective. |
-| Values do not match a billing total or the next prompt | This is one reported assistant snapshot. It is not a sum across turns, a billing calculator, or a tokenizer. |
+| Installation command is unavailable | Run `opencode --version` and `opencode plugin --help`. This version requires V2; keep plugin `1.0.1` if you still use V1. |
+| No panel appears | Check the host version, the `cli.json` entry, and `session.sidebar: "auto"`. Widen the terminal. For local installations, check the `package.json` + root `tui.js` + `dist/tui.js` layout, then restart OpenCode. |
+| `no usage snapshot yet` | No eligible assistant message has positive output tokens. Reverted messages and usage before a completed compaction are excluded. |
+| Tokens appear but the overview is empty / `0% used` | A positive context limit is unavailable for the model that produced the measured message. Check its provider metadata. |
+| Counts or percentage disappear in a narrow sidebar | The responsive layout hides details that do not fit. Widen the terminal/sidebar; `barWidth` does not override measured width. |
+| Other context information is still visible | This plugin appends its panel to the existing sidebar. It does not disable host content or other plugins. |
+| Values do not match a billing total or the next prompt | This is one reported assistant snapshot, not a cumulative bill or a tokenizer. |
 
 Still having trouble? [Open an issue](https://github.com/SolitudeRA/opencode-tui-context/issues) with your OpenCode version, OS/terminal, plugin options, and a minimal reproduction. Include a redacted screenshot if the problem is visual.
 
 ## Update or remove
 
-**npm:** replace `<version>` with a released version and run:
+**npm:** run `opencode plugin check` to check available updates. To select a specific published V2 release, change only this plugin's `package` version in `cli.json`, preserving its options, and restart OpenCode. See `opencode plugin update --help` for the host's update command. V1 users should stay pinned to `1.0.1`.
+
+**ZIP:** replace the installed directory with a newer V2 release, keeping the same path in `cli.json`. **Source:** update your unmodified checkout, then repeat the build and copy steps. Restart OpenCode.
+
+To remove the npm entry from global configuration:
 
 ```sh
-opencode plugin -g "opencode-tui-context@<version>" --force
+opencode plugin remove opencode-tui-context
 ```
 
-Omit `-g` for a project installation. On OpenCode `1.18.31`, `--force` replaces the configured package version while preserving tuple options. An explicit version stays pinned; a bare package name follows `latest`. Restart OpenCode after updating. See the host's [update behavior](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install).
-
-**ZIP:** download a newer prebuilt asset and replace the installed directory, keeping the same path in `tui.json`. **Source:** in an unmodified checkout, run `git pull --ff-only`, then repeat the build and copy steps. Restart OpenCode.
-
-To stop loading the plugin, remove its entry from `tui.json`'s `plugin` array and restart. For local installations, you can then delete the copied `local-plugins/opencode-tui-context` directory. OpenCode `1.18.31` has no plugin uninstall command; removing the config entry does not clear its npm cache. If you disabled the built-in context panel, re-enable it through `plugin_enabled` or the plugin manager.
+Alternatively, remove this plugin's entry from the `plugins` array in `cli.json` and restart. For local installations, you may then delete the copied `local-plugins/opencode-tui-context` directory. Do not remove other plugin entries or the entire OpenCode configuration.

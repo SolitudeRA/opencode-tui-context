@@ -28,16 +28,29 @@ export function tokensOf(message: unknown): TokenCounts {
   }
 }
 
-export function lastAssistantWithTokens(messages: readonly unknown[]): AssistantUsage | undefined {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
+/** Reads the latest output-bearing V2 assistant step in the active context. */
+export function lastAssistantWithTokens(
+  messages: readonly unknown[],
+  revertMessageID?: string,
+): AssistantUsage | undefined {
+  const end = revertMessageID === undefined
+    ? messages.length
+    : messages.findIndex((message) => asRecord(message).id === revertMessageID)
+  // An unknown revert boundary may mean the cache is incomplete. Do not show reverted usage.
+  if (end < 0) return undefined
+
+  for (let index = end - 1; index >= 0; index -= 1) {
     const message = asRecord(messages[index])
-    if (message.role !== "assistant") continue
+    // Compaction-request tokens are not the size of the new context. Wait for its next assistant step.
+    if (message.type === "compaction" && message.status === "completed") return undefined
+    if (message.type !== "assistant") continue
     // A message qualifies only when its own output tokens are greater than zero, never the total.
     const output = asRecord(message.tokens).output ?? 0
-    const carriesOutput = typeof output === "number" && output > 0
+    const carriesOutput = typeof output === "number" && Number.isFinite(output) && output > 0
     if (!carriesOutput) continue
-    const providerID = optionalString(message.providerID)
-    const modelID = optionalString(message.modelID)
+    const model = asRecord(message.model)
+    const providerID = optionalString(model.providerID)
+    const modelID = optionalString(model.id)
     return {
       tokens: tokensOf(message),
       ...(providerID === undefined ? {} : { providerID }),

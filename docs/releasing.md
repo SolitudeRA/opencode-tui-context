@@ -1,12 +1,12 @@
 # Releasing opencode-tui-context
 
-Users should install the prebuilt npm package with `opencode plugin -g opencode-tui-context`. GitHub Releases provide a ZIP for manual installation. Both downloads come from the same checked package contents; users do not need Bun or a compiler.
+Users should install the prebuilt npm package with `opencode plugin add opencode-tui-context@<version>`. GitHub Releases provide a ZIP for manual installation. Both downloads come from the same checked package contents; users do not need Bun or a compiler.
 
-The repository contains the release machinery, but adding these files does not publish a package or configure npm. Complete the one-time npm setup before expecting tag releases to succeed.
+The `2.x` series targets OpenCode V2 (`>=2.0.32 <3`). Published `1.0.1` remains the V1 release. Do not move its tag or ask V1 users to install the V2 bundle. A matching release tag starts publication.
 
 ## What the workflows do
 
-[CI](../.github/workflows/ci.yml) checks pull requests and pushes to `main` on Ubuntu and Windows. Each runner installs the frozen Bun lockfile, checks types, runs tests, and builds and verifies the release archives. The workflow retains installable artifacts for 14 days.
+[CI](../.github/workflows/ci.yml) checks pull requests and pushes to `main` on Ubuntu and Windows. Each runner installs the frozen Bun lockfile, checks types, runs unit tests and `bun run test:render`, then builds and verifies the release archives. The workflow retains installable artifacts for 14 days.
 
 [Release](../.github/workflows/release.yml) runs when a `v*` tag is pushed. It:
 
@@ -33,25 +33,11 @@ In the package's npm **Settings → Trusted publishing**, add a GitHub Actions p
 
 New trusted-publisher configurations can default to staged publishing. This workflow uses direct publishing, so explicitly allow `npm publish`. The npm documentation requires GitHub-hosted runners, Node.js `>=22.14.0`, and npm `>=11.5.1`; the pinned toolchain meets those requirements. Public packages published from public GitHub repositories through OIDC receive provenance automatically. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) for setup and troubleshooting.
 
-### If the npm package does not exist yet
+### V2 release boundary
 
-Trusted publishing is configured in an existing package's settings. Bootstrap the first real version with an interactive maintainer login, then configure the publisher above. See npm's [first-publication guide](https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages/).
+V2 releases reuse the existing package name; no bootstrap publication is needed. Verify the trusted publisher above before pushing the tag. The stable release workflow publishes to `latest`, so the release notes and all three READMEs must clearly direct V1 users to `opencode-tui-context@1.0.1` and its tagged documentation.
 
-1. When actually preparing the first publication, remove the temporary "npm package is not published yet" notice from all three READMEs, then regenerate and verify the archives. Commit and push those reviewed release changes to `main`, and wait for both CI jobs to pass. For the first release using this workflow, the prepared version is `1.0.1`; the existing `v1.0.0` tag must not be moved or reused. The CI artifact and eventual tag must come from this same commit.
-2. Download and extract the **`package-ubuntu-latest`** artifact from that exact CI run. Use its `.tgz` unchanged, so the initial npm publication and the subsequent tag workflow can compare identical bytes.
-3. Verify the downloaded checksums. On Linux/macOS, run `shasum -a 256 -c SHA256SUMS` inside the extracted artifact. On PowerShell, compare `Get-FileHash .\opencode-tui-context-1.0.1.tgz -Algorithm SHA256` with the matching line in `SHA256SUMS`.
-4. From the extracted artifact directory, authenticate and publish:
-
-   ```sh
-   npm login --registry=https://registry.npmjs.org
-   npm publish ./opencode-tui-context-1.0.1.tgz --access public --tag latest --ignore-scripts --registry=https://registry.npmjs.org
-   ```
-
-   Complete npm's interactive authentication and 2FA prompts. Keep credentials out of the repository, workflow, and command arguments. A local bootstrap publish does not receive the workflow's automatic OIDC provenance.
-
-5. Configure the trusted publisher in npm, then tag the **same commit** as described below. The workflow recognizes the identical existing npm archive and proceeds to create the GitHub Release. Future new versions use OIDC publishing automatically.
-
-If a tag workflow was started before bootstrap and failed at npm authentication, its **`release-ubuntu-latest`** artifact can be used instead. Publish that exact archive, configure the trusted publisher, and rerun the failed jobs.
+Before an approved publication, update all three READMEs and user guides for the target version, removing any temporary prerelease notices. Regenerate and review the archives from that exact commit. Document completed checks separately from checks still pending; package validation does not establish registry installation or interactive acceptance.
 
 ## Prepare a release
 
@@ -61,10 +47,13 @@ Update `package.json` to an unused stable version and refresh `bun.lock` if requ
 bun install --frozen-lockfile
 bun run typecheck
 bun test
+bun run test:render
 npm run release:pack
 ```
 
-`release:pack` rebuilds the bundle before packing and checks the package's file list and `./tui` entry point. It creates:
+`test:render` rebuilds `dist/tui.js` and runs the built plugin in the real OpenTUI test renderer with a mocked V2 host context. Its nine scenario groups exercise empty state, reactive tokens, message-model lookup, session/location switching, revert boundaries, compaction, resizing, live theme colors, and cleanup. It makes no network requests and does not launch OpenCode, so it complements the host smoke check below.
+
+`release:pack` rebuilds the bundle before packing and checks the package's file list, npm `./tui` export, and root `tui.js` entry for local directory loading. It creates:
 
 ```text
 release/
@@ -73,7 +62,7 @@ release/
 └── SHA256SUMS
 ```
 
-The `.tgz` is the npm package. The ZIP contains a top-level `opencode-tui-context/` directory with `package.json`, `dist/tui.js`, license, README files, and documentation assets. Source code, tests, build tools, and `node_modules` are not needed by users. Do not hand-edit the archives or publish from an unchecked working directory. The workflow publishes the already-verified tarball with lifecycle scripts disabled, avoiding a second build at publication time.
+The `.tgz` is the npm package. The ZIP contains a top-level `opencode-tui-context/` directory with eight files: `package.json`, the root `tui.js`, `dist/tui.js`, `LICENSE`, three READMEs, and the preview SVG. Preserve the root `tui.js` for local loading; npm uses the manifest's `./tui` export, and both resolve to the same bundle. Source code, tests, build tools, and `node_modules` are not needed by users. Do not hand-edit the archives or publish from an unchecked working directory. The workflow publishes the already-verified tarball with lifecycle scripts disabled, avoiding a second build at publication time.
 
 Before releasing, extract the ZIP and run the isolated host smoke check against that package directory:
 
@@ -81,15 +70,15 @@ Before releasing, extract the ZIP and run the isolated host smoke check against 
 node scripts/smoke-host.mjs --package=/absolute/path/to/opencode-tui-context --opencode=/absolute/path/to/opencode
 ```
 
-Run the helper in an interactive terminal; it requires a TTY and an installed OpenCode host. It creates a temporary isolated configuration and checks that the real OpenCode TUI activates the packaged plugin, without model calls. It records activation evidence and the bundle's SHA-256 in `host-evidence.json` at the printed temporary path. This verifies module loading and activation, not npm registry installation or the rendered sidebar. The CI workflows do not claim interactive host acceptance.
+Run the helper in an interactive terminal; it requires a TTY and OpenCode V2. It copies the unpacked release away from development dependencies and creates isolated home, configuration, cache, and data directories. It imports synthetic sessions, checks the rendered sidebar's known `20% used` snapshot and empty state, exercises the real revert/clear APIs, checks narrow/wide terminal visibility, and disables/re-enables the plugin through `cli.json`. No external model is called. It records the rendered text, session snapshots, host version, and bundle SHA-256 in `host-evidence.json` at the printed temporary path. This verifies local-package loading and fixture behavior; npm registry installation and real-provider usage are separate checks. The CI workflows do not launch this interactive helper.
 
-Also check the panel interactively in a separate OpenCode configuration: load the extracted directory, restart OpenCode, open the sidebar, and check an empty session and a session with reported token usage. Check narrow widths and coexistence with the built-in context panel. Passing package checks and plugin activation does not establish that every rendered state is correct.
+Also check the panel interactively in a separate OpenCode configuration: load the extracted directory, restart OpenCode, open the sidebar, and check an empty session and a session with reported token usage. Exercise reactive updates, switching sessions and models, revert/unrevert, completed compaction, narrow widths, theme changes, and plugin disposal. Check coexistence with the existing sidebar. If using imported fixtures or a local test provider, record that separately from real-provider validation. Passing package checks and plugin activation does not establish that every rendered state is correct.
 
-Commit the version, docs, and lockfile changes. Wait for CI to pass, then create and push the matching tag. For example, when the committed version is `1.0.1`:
+Commit the version, docs, and lockfile changes. Wait for CI to pass, then create and push the matching tag. For example, when the committed version is `2.0.0`:
 
 ```sh
-git tag -a v1.0.1 -m "Release 1.0.1"
-git push origin v1.0.1
+git tag -a v2.0.0 -m "Release 2.0.0"
+git push origin v2.0.0
 ```
 
 Pushing the tag starts external publication. Check the target commit and version before running these commands. The workflow does not bump versions, commit changes, or create tags for you.
@@ -99,10 +88,10 @@ Pushing the tag starts external publication. Check the target commit and version
 After the release succeeds, use a clean OpenCode configuration to run:
 
 ```sh
-opencode plugin -g opencode-tui-context
+opencode plugin add opencode-tui-context@2.0.0
 ```
 
-Restart OpenCode and repeat the host checks above. Confirm that the published version resolves from npm, the package appears in OpenCode's plugin manager, and the panel renders after a response reports usage. Download the GitHub ZIP as well, verify `SHA256SUMS`, and confirm its manual-install layout. Open the [npm package page](https://www.npmjs.com/package/opencode-tui-context) and check that the README, preview image, and links render correctly; including an image in the archive does not itself verify npm's page rendering. Record the OpenCode version and operating system used in the release notes, distinguishing tested hosts from the broader declared compatibility range.
+Restart OpenCode and repeat the host checks above. Confirm that the published version resolves from npm, its CLI-only entry is in `cli.json`, and the panel renders after a response reports usage. Download the GitHub ZIP as well, verify `SHA256SUMS`, and confirm its manual-install layout. Open the [npm package page](https://www.npmjs.com/package/opencode-tui-context) and check that the README, preview image, and links render correctly; including an image in the archive does not itself verify npm's page rendering. Record the OpenCode version and operating system used in the release notes, distinguishing tested hosts from the broader declared compatibility range.
 
 ## Recover a failed release
 

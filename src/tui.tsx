@@ -1,6 +1,4 @@
-import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
-import { tui } from "./plugin"
+import { Plugin } from "@opencode/plugin/tui"
+import { setup } from "./plugin"
 
-const plugin = { id: "opencode-tui-context", tui }
-
-export default plugin satisfies TuiPluginModule & { id: string }
+export default Plugin.define({ id: "opencode-tui-context", setup })

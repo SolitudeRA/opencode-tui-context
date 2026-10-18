@@ -9,7 +9,6 @@ import {
   overviewLegendItems,
   overviewToken,
   segmentColor,
-  setPanelWidth,
   titleRung,
   type LegendRung,
   type ResolvedOptions,
@@ -46,32 +45,13 @@ const compositionUsage: Usage = {
   ],
 }
 
-// Hands every colour token its own obviously-fake value, so an assertion against one token cannot be
-// satisfied by a different token the implementation might look up instead. Every field is required, so
-// a new or renamed theme token breaks this builder at compile time. `thinkingOpacity` is the only
-// non-colour member.
+// Give each palette entry a distinct value to catch incorrect legend/bar mappings.
 function sentinelTheme(): Theme {
   let index = 0
-  const token = (): RGBA => {
-    index += 1
-    return RGBA.fromHex(`#${index.toString(16).padStart(6, "0")}`)
-  }
+  const token = (): RGBA => RGBA.fromHex('#' + (++index).toString(16).padStart(6, '0'))
   return {
-    primary: token(), secondary: token(), accent: token(), error: token(), warning: token(), success: token(), info: token(),
-    text: token(), textMuted: token(), selectedListItemText: token(),
-    background: token(), backgroundPanel: token(), backgroundElement: token(), backgroundMenu: token(),
-    border: token(), borderActive: token(), borderSubtle: token(),
-    diffAdded: token(), diffRemoved: token(), diffContext: token(), diffHunkHeader: token(),
-    diffHighlightAdded: token(), diffHighlightRemoved: token(),
-    diffAddedBg: token(), diffRemovedBg: token(), diffContextBg: token(), diffLineNumber: token(),
-    diffAddedLineNumberBg: token(), diffRemovedLineNumberBg: token(),
-    markdownText: token(), markdownHeading: token(), markdownLink: token(), markdownLinkText: token(),
-    markdownCode: token(), markdownBlockQuote: token(), markdownEmph: token(), markdownStrong: token(),
-    markdownHorizontalRule: token(), markdownListItem: token(), markdownListEnumeration: token(),
-    markdownImage: token(), markdownImageText: token(), markdownCodeBlock: token(),
-    syntaxComment: token(), syntaxKeyword: token(), syntaxFunction: token(), syntaxVariable: token(),
-    syntaxString: token(), syntaxNumber: token(), syntaxType: token(), syntaxOperator: token(), syntaxPunctuation: token(),
-    thinkingOpacity: 1,
+    primary: token(), secondary: token(), accent: token(), success: token(), warning: token(),
+    text: token(), textMuted: token(), borderSubtle: token(),
   }
 }
 
@@ -210,18 +190,15 @@ describe("compositionLegendItems", () => {
 
 describe("panel width", () => {
   test("subtracts the four frame columns from a 24-column panel", () => {
-    setPanelWidth(24)
-    expect(effectiveWidth()).toBe(20)
+    expect(effectiveWidth(24)).toBe(20)
   })
 
   test("subtracts the four frame columns from an eight-column panel", () => {
-    setPanelWidth(8)
-    expect(effectiveWidth()).toBe(4)
+    expect(effectiveWidth(8)).toBe(4)
   })
 
   test("tracks a wide 200-column panel", () => {
-    setPanelWidth(200)
-    expect(effectiveWidth()).toBe(196)
+    expect(effectiveWidth(200)).toBe(196)
   })
 })
 

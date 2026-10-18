@@ -22,7 +22,7 @@
 ### npm からインストール
 
 ```sh
-opencode plugin add opencode-tui-context@2.0.0
+opencode plugin add opencode-tui-context@2.0.1
 ```
 
 CLI 専用パッケージをグローバルの `cli.json` に追加します。OpenCode V2 の CLI 設定はグローバルのみで、プロジェクト単位の `cli.json` はありません。[プラグインのコマンド](https://opencode.ai/v2/docs/cli/commands/#plugin)と [CLI 設定](https://opencode.ai/v2/docs/cli/config/)も参照してください。
@@ -123,7 +123,7 @@ npm からインストールした場合は `cli.json` のオブジェクト形�
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.0.0",
+      "package": "opencode-tui-context@2.0.1",
       "options": {
         "barWidth": 24,
         "exclude": [],

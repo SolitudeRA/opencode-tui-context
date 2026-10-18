@@ -74,11 +74,11 @@ Run the helper in an interactive terminal; it requires a TTY and OpenCode V2. It
 
 Also check the panel interactively in a separate OpenCode configuration: load the extracted directory, restart OpenCode, open the sidebar, and check an empty session and a session with reported token usage. Exercise reactive updates, switching sessions and models, revert/unrevert, completed compaction, narrow widths, theme changes, and plugin disposal. Check coexistence with the existing sidebar. If using imported fixtures or a local test provider, record that separately from real-provider validation. Passing package checks and plugin activation does not establish that every rendered state is correct.
 
-Commit the version, docs, and lockfile changes. Wait for CI to pass, then create and push the matching tag. For example, when the committed version is `2.0.0`:
+Commit the version, docs, and lockfile changes. Wait for CI to pass, then create and push the matching tag. For example, when the committed version is `2.0.1`:
 
 ```sh
-git tag -a v2.0.0 -m "Release 2.0.0"
-git push origin v2.0.0
+git tag -a v2.0.1 -m "Release 2.0.1"
+git push origin v2.0.1
 ```
 
 Pushing the tag starts external publication. Check the target commit and version before running these commands. The workflow does not bump versions, commit changes, or create tags for you.
@@ -88,7 +88,7 @@ Pushing the tag starts external publication. Check the target commit and version
 After the release succeeds, use a clean OpenCode configuration to run:
 
 ```sh
-opencode plugin add opencode-tui-context@2.0.0
+opencode plugin add opencode-tui-context@2.0.1
 ```
 
 Restart OpenCode and repeat the host checks above. Confirm that the published version resolves from npm, its CLI-only entry is in `cli.json`, and the panel renders after a response reports usage. Download the GitHub ZIP as well, verify `SHA256SUMS`, and confirm its manual-install layout. Open the [npm package page](https://www.npmjs.com/package/opencode-tui-context) and check that the README, preview image, and links render correctly; including an image in the archive does not itself verify npm's page rendering. Record the OpenCode version and operating system used in the release notes, distinguishing tested hosts from the broader declared compatibility range.

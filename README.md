@@ -20,7 +20,7 @@ English · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blo
 Requires **OpenCode V2 (`>=2.0.32 <3`)**. V1 users should keep `opencode-tui-context@1.0.1` and use the [V1 guide](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md).
 
 ```sh
-opencode plugin add opencode-tui-context@2.0.0
+opencode plugin add opencode-tui-context@2.0.1
 ```
 
 OpenCode downloads the prebuilt plugin and adds it to the global **`cli.json`**; no local build is needed. See the [V2 installation guide](https://opencode.ai/v2/docs/cli/commands/#plugin).
@@ -56,7 +56,7 @@ The defaults work without additional configuration. To hide the legends, edit th
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.0.0",
+      "package": "opencode-tui-context@2.0.1",
       "options": { "showLegend": false }
     }
   ]

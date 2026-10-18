@@ -10,14 +10,11 @@ Installation alternatives, configuration, usage calculations, and troubleshootin
 
 ### Requirements
 
-- **OpenCode `>=2.0.32 <3`** and this plugin's `2.x` source. The development SDK is pinned to `@opencode/plugin@2.0.32`; the declared range does not mean every host version has been tested. See [package.json](../package.json).
-- **`2.0.0` is not published yet.** Use the source installation below for local testing. The npm and ZIP instructions apply after a V2 release is published.
+- **OpenCode `>=2.0.32 <3`** and plugin version `2.x`. The development SDK is pinned to `@opencode/plugin@2.0.32`; the declared range does not mean every host version has been tested. See [package.json](../package.json).
 - V1 users should pin **`opencode-tui-context@1.0.1`** and follow the [V1 README](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md). The V2 bundle does not load in V1.
 - Source installation needs **Git, [Bun](https://bun.sh/), and [Node.js](https://nodejs.org/)**. Published npm and ZIP packages do not need a local build.
 
 ### Install from npm
-
-After `2.0.0` is published:
 
 ```sh
 opencode plugin add opencode-tui-context@2.0.0
@@ -177,7 +174,6 @@ The panel reacts to OpenCode V2's cached session, message, model, and theme data
 | Symptom | What to check |
 | --- | --- |
 | Installation command is unavailable | Run `opencode --version` and `opencode plugin --help`. This version requires V2; keep plugin `1.0.1` if you still use V1. |
-| npm cannot find `2.0.0` | It is not published yet. Use the V2 source checkout; do not substitute the V1 package into a V2 installation. |
 | No panel appears | Check the host version, the `cli.json` entry, and `session.sidebar: "auto"`. Widen the terminal. For local installations, check the `package.json` + root `tui.js` + `dist/tui.js` layout, then restart OpenCode. |
 | `no usage snapshot yet` | No eligible assistant message has positive output tokens. Reverted messages and usage before a completed compaction are excluded. |
 | Tokens appear but the overview is empty / `0% used` | A positive context limit is unavailable for the model that produced the measured message. Check its provider metadata. |

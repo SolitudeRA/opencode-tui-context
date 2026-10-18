@@ -2,7 +2,7 @@
 
 Users should install the prebuilt npm package with `opencode plugin add opencode-tui-context@<version>`. GitHub Releases provide a ZIP for manual installation. Both downloads come from the same checked package contents; users do not need Bun or a compiler.
 
-This checkout prepares the unpublished `2.0.0` migration for OpenCode V2 (`>=2.0.32 <3`). Published `1.0.1` remains the V1 release. Do not move its tag or ask V1 users to install the V2 bundle. Local migration and validation do not publish a package; a matching release tag starts publication.
+The `2.x` series targets OpenCode V2 (`>=2.0.32 <3`). Published `1.0.1` remains the V1 release. Do not move its tag or ask V1 users to install the V2 bundle. A matching release tag starts publication.
 
 ## What the workflows do
 
@@ -35,9 +35,9 @@ New trusted-publisher configurations can default to staged publishing. This work
 
 ### V2 release boundary
 
-The existing package name is reused for `2.0.0`; no bootstrap publication is needed. Verify the trusted publisher above before pushing the tag. The stable release workflow publishes to `latest`, so the release notes and all three READMEs must clearly direct V1 users to `opencode-tui-context@1.0.1` and its tagged documentation.
+V2 releases reuse the existing package name; no bootstrap publication is needed. Verify the trusted publisher above before pushing the tag. The stable release workflow publishes to `latest`, so the release notes and all three READMEs must clearly direct V1 users to `opencode-tui-context@1.0.1` and its tagged documentation.
 
-Keep the unpublished notice in the READMEs while migration is under review. When preparing the approved publication, remove that notice, the conditional wording around npm installation, and the temporary “2.0.0 is not published” troubleshooting row from all three user guides. Regenerate and review the archives from that exact commit. Do not publish a README that claims registry installation or interactive acceptance before those checks have actually run.
+Before an approved publication, update all three READMEs and user guides for the target version, removing any temporary prerelease notices. Regenerate and review the archives from that exact commit. Document completed checks separately from checks still pending; package validation does not establish registry installation or interactive acceptance.
 
 ## Prepare a release
 

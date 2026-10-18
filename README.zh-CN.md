@@ -17,9 +17,7 @@
 
 ## 快速开始
 
-当前源码面向 **OpenCode V2（`>=2.0.32 <3`）**。**插件 `2.0.0` 尚未发布**，可先[从源码安装](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.zh-CN.md#从源码安装)体验。V1 用户请固定使用 `opencode-tui-context@1.0.1`，并参考 [V1 指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)。
-
-`2.0.0` 发布后运行：
+需要 **OpenCode V2（`>=2.0.32 <3`）**。V1 用户请固定使用 `opencode-tui-context@1.0.1`，并参考 [V1 指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)。
 
 ```sh
 opencode plugin add opencode-tui-context@2.0.0

@@ -17,9 +17,7 @@
 
 ## クイックスタート
 
-このソースは **OpenCode V2（`>=2.0.32 <3`）** 向けです。**プラグイン `2.0.0` は未公開**のため、試す場合は[ソースからインストール](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.ja.md#ソースからインストール)してください。V1 ユーザーは `opencode-tui-context@1.0.1` に固定し、[V1 ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)を参照してください。
-
-`2.0.0` の公開後に実行します。
+**OpenCode V2（`>=2.0.32 <3`）** が必要です。V1 ユーザーは `opencode-tui-context@1.0.1` に固定し、[V1 ガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)を参照してください。
 
 ```sh
 opencode plugin add opencode-tui-context@2.0.0

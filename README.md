@@ -17,9 +17,7 @@ English · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blo
 
 ## Quick start
 
-This checkout targets **OpenCode V2 (`>=2.0.32 <3`)**. **Plugin `2.0.0` is not published yet**; use the [source installation](https://github.com/SolitudeRA/opencode-tui-context/blob/main/docs/guide.md#install-from-source) to try it locally. V1 users should keep `opencode-tui-context@1.0.1` and use the [V1 guide](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md).
-
-After `2.0.0` is published:
+Requires **OpenCode V2 (`>=2.0.32 <3`)**. V1 users should keep `opencode-tui-context@1.0.1` and use the [V1 guide](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md).
 
 ```sh
 opencode plugin add opencode-tui-context@2.0.0

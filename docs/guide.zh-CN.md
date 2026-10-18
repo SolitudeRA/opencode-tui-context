@@ -10,14 +10,11 @@
 
 ### 环境要求
 
-- **OpenCode `>=2.0.32 <3`**，以及本插件的 `2.x` 源码。开发 SDK 固定为 `@opencode/plugin@2.0.32`；声明范围不表示每个宿主版本均已实测。详见 [package.json](../package.json)。
-- **`2.0.0` 尚未发布。** 本地体验请按下文从源码安装；npm 和 ZIP 步骤供 V2 版本发布后使用。
+- **OpenCode `>=2.0.32 <3`**，以及本插件的 `2.x` 版本。开发 SDK 固定为 `@opencode/plugin@2.0.32`；声明范围不表示每个宿主版本均已实测。详见 [package.json](../package.json)。
 - V1 用户请固定使用 **`opencode-tui-context@1.0.1`**，并参考 [V1 README](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)。V2 构建产物不能在 V1 中加载。
 - 源码安装需要 **Git、[Bun](https://bun.sh/) 和 [Node.js](https://nodejs.org/)**；已发布的 npm 包和 ZIP 无需本地构建。
 
 ### npm 安装
-
-`2.0.0` 发布后运行：
 
 ```sh
 opencode plugin add opencode-tui-context@2.0.0
@@ -177,7 +174,6 @@ percent  = min(100, round(used / window × 100))
 | 现象 | 检查方法 |
 | --- | --- |
 | 安装命令不可用 | 运行 `opencode --version` 和 `opencode plugin --help`。当前插件需要 V2；继续使用 V1 时，请保留插件 `1.0.1`。 |
-| npm 找不到 `2.0.0` | 此版本尚未发布，请使用包含 V2 改动的源码，不要用 V1 包替代。 |
 | 没有面板 | 检查宿主版本、`cli.json` 条目和 `session.sidebar: "auto"`，并加宽终端。本地安装还需确认 `package.json` + 根目录 `tui.js` + `dist/tui.js` 布局，然后重启。 |
 | 显示 `no usage snapshot yet` | 当前没有符合条件且输出 token 为正数的 assistant 消息；已回退消息和已完成压缩之前的用量会被排除。 |
 | 有 token，但总览条为空 / 显示 `0% used` | 无法取得生成该消息的模型的正数上下文上限，请检查其提供商元数据。 |

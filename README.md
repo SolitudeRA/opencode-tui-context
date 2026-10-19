@@ -19,10 +19,10 @@ English · [简体中文](https://github.com/SolitudeRA/opencode-tui-context/blo
 
 **One package version supports OpenCode V1 and V2.** Check `opencode --version`, then use the matching command:
 
-| OpenCode | Install `2.1.0` | Global configuration |
+| OpenCode | Install `2.1.1` | Global configuration |
 | --- | --- | --- |
-| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.0` | `tui.json` → `plugin` |
-| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.0` | `cli.json` → `plugins` |
+| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.1` | `tui.json` → `plugin` |
+| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.1` | `cli.json` → `plugins` |
 
 OpenCode downloads the prebuilt package; no local build or manual adapter selection is needed. Restart OpenCode, open a session, and show the sidebar. The **Context** panel displays the latest assistant usage with positive output tokens in the active context; until then, it shows `no usage snapshot yet`.
 

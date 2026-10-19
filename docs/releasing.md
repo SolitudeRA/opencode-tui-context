@@ -2,7 +2,7 @@
 
 Users install the same prebuilt npm package on both hosts: `opencode plugin -g opencode-tui-context@<version>` in V1, or `opencode plugin add opencode-tui-context@<version>` in V2. GitHub Releases provide a ZIP for manual installation. Both downloads come from the same checked package contents; users do not need Bun or a compiler.
 
-Version `2.1.0` supports OpenCode V1 `>=1.18.31 <2` and V2 `>=2.0.32 <3` in one package. Validate both host baselines (`1.18.31` and `2.0.32`) before publication. Published `1.0.1` remains an optional V1 fallback; V1 users do not need a separate current package version. A matching release tag starts publication.
+Version `2.1.1` supports OpenCode V1 `>=1.18.31 <2` and V2 `>=2.0.32 <3` in one package. Validate both host baselines (`1.18.31` and `2.0.32`) before publication. Published `1.0.1` remains an optional V1 fallback; V1 users do not need a separate current package version. A matching release tag starts publication.
 
 ## What the workflows do
 
@@ -53,7 +53,9 @@ npm run release:pack
 
 `test:render` builds `dist/tui.js`, `dist/tui-v1.js`, and `dist/tui-v2.js`, then runs `scripts/test-entrypoints.mjs` and both renderer checks (`scripts/test-render.mjs` for V2, `scripts/test-render-v1.mjs` for V1). The entrypoint check verifies lazy adapter loading and isolation from the other host SDK. Renderer checks use the matching native OpenTUI version with mocked host contexts. They exercise usage, reactive updates, active-context boundaries, layout, themes, and cleanup without model requests or launching OpenCode; actual host loading is a separate check.
 
-`release:pack` rebuilds the bundle before packing and checks the package's file list, npm `./tui` export, and root `tui.js` entry for local directory loading. It creates:
+OpenCode supplies its SDK, OpenTUI, and Solid at runtime. Keep them in `devDependencies` only and retain the supported host range in `engines.opencode`. Do not add runtime dependencies or peer dependencies for these host-provided modules: even optional peers can trigger resolution of both SDKs and incompatible transitive renderer versions during installation.
+
+`release:pack` rebuilds the bundles, checks the package file list, npm `./tui` export, and root `tui.js` entry, then runs a normal npm install of the tarball in a clean temporary project. This uses the public npm registry with fresh configuration and an empty cache, disables scripts, audit, and funding requests, and verifies that only the plugin is installed. Do not replace it with `--offline`: npm can skip missing optional-peer metadata in that mode and miss the original dependency-resolution failure. Unpacking an archive and loading a local directory cannot exercise this resolver path; native registry installation still needs a post-publication check on both hosts. It creates:
 
 ```text
 release/
@@ -75,11 +77,11 @@ Run the helpers in an interactive terminal with the matching host executable. Th
 
 On each host version, also check the panel interactively in a separate OpenCode configuration: load the extracted directory, restart OpenCode, open the sidebar, and check an empty session and a session with reported token usage. Exercise reactive updates, switching sessions and models, revert/unrevert, completed compaction, narrow widths, theme changes, and plugin disposal. Check coexistence with the existing sidebar. If using imported fixtures or a local test provider, record that separately from real-provider validation. Passing package checks and plugin activation does not establish that every rendered state is correct.
 
-Commit the version, docs, and lockfile changes. Wait for CI to pass, then create and push the matching tag. For example, when the committed version is `2.1.0`:
+Commit the version, docs, and lockfile changes. Wait for CI to pass, then create and push the matching tag. For example, when the committed version is `2.1.1`:
 
 ```sh
-git tag -a v2.1.0 -m "Release 2.1.0"
-git push origin v2.1.0
+git tag -a v2.1.1 -m "Release 2.1.1"
+git push origin v2.1.1
 ```
 
 Pushing the tag starts external publication. Check the target commit and version before running these commands. The workflow does not bump versions, commit changes, or create tags for you.
@@ -90,8 +92,8 @@ After the release succeeds, use separate clean configurations for both host vers
 
 | Host | Install command | Expected entry |
 | --- | --- | --- |
-| V1 | `opencode plugin -g opencode-tui-context@2.1.0` | `tui.json` → `plugin` |
-| V2 | `opencode plugin add opencode-tui-context@2.1.0` | `cli.json` → `plugins` |
+| V1 | `opencode plugin -g opencode-tui-context@2.1.1` | `tui.json` → `plugin` |
+| V2 | `opencode plugin add opencode-tui-context@2.1.1` | `cli.json` → `plugins` |
 
 Restart OpenCode and repeat the host checks above. Confirm that the published version resolves from npm, its entry is in the matching host configuration, and the panel renders after a response reports usage. Download the GitHub ZIP as well, verify `SHA256SUMS`, and confirm its manual-install layout. Open the [npm package page](https://www.npmjs.com/package/opencode-tui-context) and check that the README, preview image, and links render correctly; including an image in the archive does not itself verify npm's page rendering. Record the OpenCode version and operating system used in the release notes, distinguishing tested hosts from the broader declared compatibility range.
 

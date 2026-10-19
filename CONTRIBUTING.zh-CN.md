@@ -35,7 +35,7 @@ npm run release:pack
 | [`scripts/test-render.mjs`](scripts/test-render.mjs)、[`scripts/test-render-v1.mjs`](scripts/test-render-v1.mjs) | 原生 V2／V1 渲染器契约检查 |
 | [`scripts/release.mjs`](scripts/release.mjs) | 归档内容、导出路径与校验文件验证 |
 
-通用入口不应包含 SDK 或渲染器的运行时导入，保证各宿主仅加载自己的适配器。V2 适配器使用 `@opencode/plugin/tui` 和 `Plugin.define()`；V1 适配器使用旧版模块契约。OpenTUI 和 Solid 保持外部导入，由宿主提供。可选 peer dependencies 描述兼容范围，无需运行时 `dependencies` 或复制开发依赖。
+通用入口不应包含 SDK 或渲染器的运行时导入，保证各宿主仅加载自己的适配器。V2 适配器使用 `@opencode/plugin/tui` 和 `Plugin.define()`；V1 适配器使用旧版模块契约。OpenCode 在运行时提供 SDK、OpenTUI 和 Solid。这些包仅放在 `devDependencies` 中：即使声明为可选 peer dependencies，也可能让 npm 同时解析两套宿主 SDK 和冲突的渲染器版本。发布包不声明运行时依赖或 peer dependencies，支持的宿主范围由 `engines.opencode` 记录。
 
 本地安装必须保留 `package.json`、根目录 `tui.js`，以及 `dist/` 下的 `tui.js`、`tui-v1.js`、`tui-v2.js`。请保留 Solid JSX 转换：通用 JSX 转换可能编译成功，却破坏响应式渲染。
 

@@ -1,6 +1,6 @@
 {
   "name": "opencode-tui-context",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "type": "module",
   "license": "MIT",
   "description": "OpenCode TUI plugin that renders session context-window usage as a segmented bar in the sidebar",
@@ -46,30 +46,6 @@
     "release:pack": "node scripts/release.mjs",
     "prepack": "npm run build",
     "prepublishOnly": "npm run typecheck && bun test && npm run test:render"
-  },
-  "peerDependencies": {
-    "@opencode-ai/plugin": ">=1.18.31 <2",
-    "@opencode/plugin": ">=2.0.32 <3",
-    "@opentui/core": ">=0.4.5 <0.6",
-    "@opentui/solid": ">=0.4.5 <0.6",
-    "solid-js": ">=1.9.12 <2"
-  },
-  "peerDependenciesMeta": {
-    "@opencode-ai/plugin": {
-      "optional": true
-    },
-    "@opencode/plugin": {
-      "optional": true
-    },
-    "@opentui/core": {
-      "optional": true
-    },
-    "@opentui/solid": {
-      "optional": true
-    },
-    "solid-js": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@opencode-ai/plugin": "1.18.31",

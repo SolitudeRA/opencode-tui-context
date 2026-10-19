@@ -35,7 +35,7 @@ Unit tests cover configuration, usage arithmetic, active-context selection in bo
 | [`scripts/test-render.mjs`](scripts/test-render.mjs), [`scripts/test-render-v1.mjs`](scripts/test-render-v1.mjs) | Native V2/V1 renderer contract checks |
 | [`scripts/release.mjs`](scripts/release.mjs) | Archive contents, export paths, and checksum validation |
 
-Keep the universal entry free of runtime SDK or renderer imports: each host must load only its own adapter. The V2 adapter uses `@opencode/plugin/tui` and `Plugin.define()`; the V1 adapter uses the legacy module contract. OpenTUI and Solid remain external and are supplied by the host. Optional peers describe compatibility; no runtime `dependencies` or copied development dependencies are needed.
+Keep the universal entry free of runtime SDK or renderer imports: each host must load only its own adapter. The V2 adapter uses `@opencode/plugin/tui` and `Plugin.define()`; the V1 adapter uses the legacy module contract. OpenCode supplies its SDK, OpenTUI, and Solid at runtime. Keep these packages in `devDependencies` only: declaring even optional runtime peers can make npm resolve both host SDKs and conflicting renderer versions. The package declares neither runtime dependencies nor peer dependencies; `engines.opencode` records the supported host range.
 
 Local installations need `package.json`, the root `tui.js`, and all three files in `dist/`: `tui.js`, `tui-v1.js`, `tui-v2.js`. Keep the Solid JSX transform; a generic JSX transform can compile successfully while breaking reactive rendering.
 

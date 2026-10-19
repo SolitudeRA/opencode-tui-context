@@ -19,10 +19,10 @@
 
 **同じパッケージバージョンで OpenCode V1 と V2 に対応します。** `opencode --version` を確認し、対応するコマンドを実行してください。
 
-| OpenCode | `2.1.0` のインストール | グローバル設定 |
+| OpenCode | `2.1.1` のインストール | グローバル設定 |
 | --- | --- | --- |
-| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.0` | `tui.json` → `plugin` |
-| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.0` | `cli.json` → `plugins` |
+| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.1` | `tui.json` → `plugin` |
+| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.1` | `cli.json` → `plugins` |
 
 OpenCode がビルド済みパッケージを取得します。ローカルのビルドやアダプターの選択は不要です。再起動してセッションのサイドバーを表示すると、**Context** パネルに現在有効なコンテキスト内で正の出力トークン数を持つ最新の使用量が表示されます。それまでは `no usage snapshot yet` と表示されます。
 

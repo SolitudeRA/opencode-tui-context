@@ -51,8 +51,9 @@ await mkdir(probeDir)
 const probePath = path.join(probeDir, "tui.js")
 await writeFile(path.join(probeDir, "package.json"), JSON.stringify({ name: "opencode-tui-context-host-observer", type: "module", exports: { "./tui": "./tui.js" } }))
 const targetSpec = pathToFileURL(locations.package + path.sep).href
-const npmConfig = path.join(root, "empty.npmrc")
-await writeFile(npmConfig, "")
+const npmUserConfig = path.join(root, "empty-user.npmrc")
+const npmGlobalConfig = path.join(root, "empty-global.npmrc")
+await Promise.all([writeFile(npmUserConfig, ""), writeFile(npmGlobalConfig, "")])
 const inherited = new Set(["PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "TERM", "COLORTERM", "LANG", "LC_ALL", "LC_CTYPE"])
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => inherited.has(key.toUpperCase())))
 Object.assign(env, {
@@ -62,7 +63,7 @@ Object.assign(env, {
   OPENCODE_TEST_HOME: locations.home, OPENCODE_CONFIG_DIR: configDir,
   OPENCODE_TEST_MANAGED_CONFIG_DIR: locations.managed,
   OPENCODE_DISABLE_AUTOUPDATE: "1", OPENCODE_DISABLE_MODELS_FETCH: "1",
-  npm_config_userconfig: npmConfig, npm_config_globalconfig: npmConfig,
+  npm_config_userconfig: npmUserConfig, npm_config_globalconfig: npmGlobalConfig,
   npm_config_cache: path.join(locations.cache, "npm"), npm_config_registry: "https://registry.npmjs.org/",
   npm_config_update_notifier: "false", npm_config_audit: "false", npm_config_fund: "false",
   TMP: locations.tmp, TEMP: locations.tmp, TMPDIR: locations.tmp,

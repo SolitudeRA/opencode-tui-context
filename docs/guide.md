@@ -10,9 +10,9 @@ Installation alternatives, configuration, usage calculations, and troubleshootin
 
 ### Requirements
 
-- **OpenCode V1 `>=1.18.31 <2` or V2 `>=2.0.32 <3`**. Package `2.1.0` includes both adapters and selects the host API automatically. Validation baselines are V1 `1.18.31` and V2 `2.0.32`; the declared range does not mean every version has been tested. See [package.json](../package.json).
+- **OpenCode V1 `>=1.18.31 <2` or V2 `>=2.0.32 <3`**. Package `2.1.1` includes both adapters and selects the host API automatically. Validation baselines are V1 `1.18.31` and V2 `2.0.32`; the declared range does not mean every version has been tested. See [package.json](../package.json).
 - Source installation needs **Git, [Bun](https://bun.sh/), and [Node.js](https://nodejs.org/)**. npm and ZIP packages do not need a local build.
-- V1 users can upgrade to `2.1.0`. If an older installation must be retained, `1.0.1` and its [tagged guide](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md) remain a fallback.
+- V1 users can upgrade to `2.1.1`. If an older installation must be retained, `1.0.1` and its [tagged guide](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.md) remain a fallback.
 
 ### Install from npm
 
@@ -20,8 +20,8 @@ Check `opencode --version` and run the matching command:
 
 | Host | Command | Writes to |
 | --- | --- | --- |
-| V1 | `opencode plugin -g opencode-tui-context@2.1.0` | Global `tui.json`, `plugin` array |
-| V2 | `opencode plugin add opencode-tui-context@2.1.0` | Global `cli.json`, `plugins` array |
+| V1 | `opencode plugin -g opencode-tui-context@2.1.1` | Global `tui.json`, `plugin` array |
+| V2 | `opencode plugin add opencode-tui-context@2.1.1` | Global `cli.json`, `plugins` array |
 
 V1 also supports project installation by omitting `-g`; see the [V1 plugin specification](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install). V2 uses a single global CLI configuration; see [V2 plugin commands](https://opencode.ai/v2/docs/cli/commands/#plugin).
 
@@ -135,7 +135,7 @@ Both adapters accept the same options. Edit the existing entry in the configurat
 ```json
 {
   "plugin": [
-    ["opencode-tui-context@2.1.0", {
+    ["opencode-tui-context@2.1.1", {
       "barWidth": 24,
       "exclude": [],
       "showLegend": true
@@ -150,7 +150,7 @@ Both adapters accept the same options. Edit the existing entry in the configurat
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.1.0",
+      "package": "opencode-tui-context@2.1.1",
       "options": {
         "barWidth": 24,
         "exclude": [],
@@ -220,7 +220,7 @@ Still having trouble? [Open an issue](https://github.com/SolitudeRA/opencode-tui
 **V1 npm:** to upgrade an existing entry while preserving tuple options, run:
 
 ```sh
-opencode plugin -g opencode-tui-context@2.1.0 --force
+opencode plugin -g opencode-tui-context@2.1.1 --force
 ```
 
 **V2 npm:** run `opencode plugin check` to check available updates. To select a published version, change only this plugin's `package` version in `cli.json`, preserving its options. See `opencode plugin update --help` for the host's update command.

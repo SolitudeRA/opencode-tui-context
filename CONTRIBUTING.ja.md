@@ -35,7 +35,7 @@ npm run release:pack
 | [`scripts/test-render.mjs`](scripts/test-render.mjs)、[`scripts/test-render-v1.mjs`](scripts/test-render-v1.mjs) | V2・V1 のネイティブレンダラーによる契約検証 |
 | [`scripts/release.mjs`](scripts/release.mjs) | アーカイブ内容、エクスポート、チェックサムの検証 |
 
-共通入口には SDK やレンダラーの実行時インポートを置かず、各ホストが自身のアダプターだけを読み込むようにします。V2 は `@opencode/plugin/tui` と `Plugin.define()`、V1 は旧モジュール契約を使います。OpenTUI と Solid は外部参照のままホストから提供されます。省略可能な peer dependencies で互換性を宣言し、実行時 `dependencies` や開発用依存関係のコピーは不要です。
+共通入口には SDK やレンダラーの実行時インポートを置かず、各ホストが自身のアダプターだけを読み込むようにします。V2 は `@opencode/plugin/tui` と `Plugin.define()`、V1 は旧モジュール契約を使います。SDK、OpenTUI、Solid は実行時に OpenCode が提供します。これらは `devDependencies` だけに置いてください。省略可能な peer dependencies でも、npm が両ホストの SDK と競合するレンダラーバージョンを解決する場合があります。公開パッケージには実行時依存関係や peer dependencies を宣言せず、対応ホストの範囲を `engines.opencode` に記録します。
 
 ローカル版には `package.json`、ルートの `tui.js`、`dist/` 内の `tui.js`・`tui-v1.js`・`tui-v2.js` が必要です。Solid JSX の変換は維持してください。汎用の JSX 変換では、コンパイルが成功してもリアクティブな描画が壊れる場合があります。
 

@@ -19,10 +19,10 @@
 
 **同一个插件版本同时支持 OpenCode V1 和 V2。** 先运行 `opencode --version`，再选择对应命令：
 
-| OpenCode | 安装 `2.1.0` | 全局配置 |
+| OpenCode | 安装 `2.1.1` | 全局配置 |
 | --- | --- | --- |
-| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.0` | `tui.json` → `plugin` |
-| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.0` | `cli.json` → `plugins` |
+| V1 `>=1.18.31 <2` | `opencode plugin -g opencode-tui-context@2.1.1` | `tui.json` → `plugin` |
+| V2 `>=2.0.32 <3` | `opencode plugin add opencode-tui-context@2.1.1` | `cli.json` → `plugins` |
 
 OpenCode 会下载预构建包，无需本地构建或手动选择适配器。重启 OpenCode 并打开会话侧边栏。**Context** 面板显示当前有效上下文内最近一份报告正数输出 token 的 assistant 用量；此前显示 `no usage snapshot yet`。
 

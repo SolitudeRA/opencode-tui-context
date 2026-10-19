@@ -15,9 +15,9 @@
 
 ### 前提条件
 
-- **OpenCode V1 `>=1.18.31 <2` または V2 `>=2.0.32 <3`** が必要です。同じ `2.1.0` パッケージに両アダプターが含まれ、ホスト API に合わせて自動選択されます。検証の基準は V1 `1.18.31` と V2 `2.0.32` であり、宣言範囲の全バージョンで確認済みという意味ではありません。[package.json](../package.json) を参照してください。
+- **OpenCode V1 `>=1.18.31 <2` または V2 `>=2.0.32 <3`** が必要です。同じ `2.1.1` パッケージに両アダプターが含まれ、ホスト API に合わせて自動選択されます。検証の基準は V1 `1.18.31` と V2 `2.0.32` であり、宣言範囲の全バージョンで確認済みという意味ではありません。[package.json](../package.json) を参照してください。
 - ソースからのインストールには **Git、[Bun](https://bun.sh/)、[Node.js](https://nodejs.org/)** が必要です。npm パッケージと ZIP はビルド不要です。
-- V1 でも `2.1.0` に更新できます。既存のインストールを維持する場合は、`1.0.1` と[当時のガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)も利用できます。
+- V1 でも `2.1.1` に更新できます。既存のインストールを維持する場合は、`1.0.1` と[当時のガイド](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.ja.md)も利用できます。
 
 ### npm からインストール
 
@@ -25,8 +25,8 @@
 
 | ホスト | コマンド | 設定先 |
 | --- | --- | --- |
-| V1 | `opencode plugin -g opencode-tui-context@2.1.0` | グローバル `tui.json` の `plugin` 配列 |
-| V2 | `opencode plugin add opencode-tui-context@2.1.0` | グローバル `cli.json` の `plugins` 配列 |
+| V1 | `opencode plugin -g opencode-tui-context@2.1.1` | グローバル `tui.json` の `plugin` 配列 |
+| V2 | `opencode plugin add opencode-tui-context@2.1.1` | グローバル `cli.json` の `plugins` 配列 |
 
 V1 は `-g` を省くとプロジェクトにインストールできます。[V1 プラグイン仕様](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)を参照してください。V2 の CLI 設定はグローバルのみです。[V2 プラグインコマンド](https://opencode.ai/v2/docs/cli/commands/#plugin)も参照してください。
 
@@ -140,7 +140,7 @@ OpenCode を再起動し、セッションのサイドバーを表示します�
 ```json
 {
   "plugin": [
-    ["opencode-tui-context@2.1.0", {
+    ["opencode-tui-context@2.1.1", {
       "barWidth": 24,
       "exclude": [],
       "showLegend": true
@@ -155,7 +155,7 @@ OpenCode を再起動し、セッションのサイドバーを表示します�
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.1.0",
+      "package": "opencode-tui-context@2.1.1",
       "options": {
         "barWidth": 24,
         "exclude": [],
@@ -225,7 +225,7 @@ V2 は Solid を通じてホストのリアクティブなキャッシュを読�
 **V1 npm：**既存のタプルオプションを保って更新するには：
 
 ```sh
-opencode plugin -g opencode-tui-context@2.1.0 --force
+opencode plugin -g opencode-tui-context@2.1.1 --force
 ```
 
 **V2 npm：**`opencode plugin check` で更新を確認します。公開済みのバージョンを指定するには、`cli.json` 内の本プラグインの `package` 接尾辞だけを変更し、オプションは残します。更新コマンドは `opencode plugin update --help` を参照してください。

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { unzipSync, zipSync } from "fflate";
@@ -29,12 +30,55 @@ const outDir = path.join(root, "release");
 mkdirSync(outDir, { recursive: true });
 const staging = mkdtempSync(path.join(outDir, ".pack-"));
 
-function run(command, args) {
-  const result = spawnSync(command, args, { cwd: root, encoding: "utf8", windowsHide: true });
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, { cwd: root, encoding: "utf8", windowsHide: true, ...options });
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.error) throw result.error;
   assert.equal(result.status, 0, `${path.basename(command)} failed:\n${result.stdout}`);
   return result.stdout;
+}
+
+function verifyIsolatedInstall(tarball, files) {
+  const temporaryRoot = path.resolve(os.tmpdir());
+  const project = mkdtempSync(path.join(temporaryRoot, "opencode-tui-context-install-"));
+  try {
+    writeFileSync(path.join(project, "package.json"), JSON.stringify({
+      name: "isolated-plugin-install", version: "0.0.0", private: true,
+    }));
+    const userConfig = path.join(project, "user.npmrc");
+    const globalConfig = path.join(project, "global.npmrc");
+    writeFileSync(userConfig, "");
+    writeFileSync(globalConfig, "");
+    const env = { ...process.env };
+    for (const key of Object.keys(env)) {
+      if (/^(?:npm_config_|npm_token$|node_auth_token$|node_path$)/i.test(key)) delete env[key];
+    }
+    Object.assign(env, {
+      HOME: project,
+      USERPROFILE: project,
+      NPM_CONFIG_USERCONFIG: userConfig,
+      NPM_CONFIG_GLOBALCONFIG: globalConfig,
+      NPM_CONFIG_CACHE: path.join(project, "cache"),
+    });
+    // Exercise npm's normal peer resolver with a clean cache. Offline mode can
+    // silently skip optional peers and conceal an installation conflict.
+    run(process.execPath, [
+      npmCli, "install", tarball, "--ignore-scripts", "--no-audit", "--no-fund",
+      "--no-update-notifier", "--package-lock=true", "--registry=https://registry.npmjs.org/",
+    ], { cwd: project, env, timeout: 60_000 });
+    const lock = JSON.parse(readFileSync(path.join(project, "package-lock.json"), "utf8"));
+    assert.deepEqual(Object.keys(lock.packages).sort(), ["", `node_modules/${manifest.name}`],
+      "Installing the plugin must not install host SDKs or renderer dependencies.");
+    for (const [file, bytes] of Object.entries(files)) {
+      assert.deepEqual(readFileSync(path.join(project, "node_modules", manifest.name, file)), bytes,
+        `The installed package differs from the release archive: ${file}`);
+    }
+    console.log("Verified a clean npm install with normal dependency resolution and no host runtime dependencies.");
+  } finally {
+    assert.equal(path.dirname(path.resolve(project)), temporaryRoot);
+    assert(path.basename(project).startsWith("opencode-tui-context-install-"));
+    rmSync(project, { recursive: true, force: true });
+  }
 }
 
 try {
@@ -69,13 +113,12 @@ try {
   assert(files["tui.js"].toString("utf8").includes('export { default } from "./dist/tui.js"'),
     "Local directory installs require the root TUI entry.");
   assert.equal(Object.keys(shipped.dependencies ?? {}).length, 0, "Unexpected runtime dependencies.");
+  assert.equal(Object.keys(shipped.optionalDependencies ?? {}).length, 0, "Unexpected optional runtime dependencies.");
+  assert.equal(Object.keys(shipped.peerDependencies ?? {}).length, 0,
+    "Host runtimes must not become part of npm's peer dependency resolution.");
+  assert.equal(Object.keys(shipped.peerDependenciesMeta ?? {}).length, 0,
+    "Host runtimes must not declare optional peers.");
   assert.equal(shipped.engines?.opencode, ">=1.18.31 <2 || >=2.0.32 <3");
-  assert.equal(shipped.peerDependencies?.["@opencode/plugin"], ">=2.0.32 <3");
-  assert.equal(shipped.peerDependencies?.["@opencode-ai/plugin"], ">=1.18.31 <2");
-  for (const sdk of ["@opencode-ai/plugin", "@opencode/plugin"]) {
-    assert.equal(shipped.peerDependenciesMeta?.[sdk]?.optional, true,
-      "Installing for one host must not require the other host's SDK.");
-  }
   for (const file of ["dist/tui.js", "dist/tui-v1.js", "dist/tui-v2.js"]) {
     assert(files[file].length > 0, `The bundle is empty: ${file}`);
   }
@@ -91,6 +134,7 @@ try {
   assert(v2.includes('from "@opencode/plugin/tui"'), "The V2 adapter must use the V2 TUI runtime.");
   assert(!v2.includes("@opencode-ai/plugin"), "The V2 adapter must not import the V1 SDK.");
   assert(!v1.includes("@opencode/plugin"), "The V1 adapter must not import the V2 SDK.");
+  verifyIsolatedInstall(tarball, files);
 
   const zipFiles = Object.fromEntries(required.map((file) => [`${manifest.name}/${file}`, files[file]]));
   // ZIP stores local calendar fields, so use a fixed local date on every platform.

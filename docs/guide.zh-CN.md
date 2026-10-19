@@ -10,9 +10,9 @@
 
 ### 环境要求
 
-- **OpenCode V1 `>=1.18.31 <2` 或 V2 `>=2.0.32 <3`**。同一份 `2.1.0` 包含两个适配器，自动匹配宿主 API。验证基线为 V1 `1.18.31` 和 V2 `2.0.32`；声明范围不表示每个版本均已实测。详见 [package.json](../package.json)。
+- **OpenCode V1 `>=1.18.31 <2` 或 V2 `>=2.0.32 <3`**。同一份 `2.1.1` 包含两个适配器，自动匹配宿主 API。验证基线为 V1 `1.18.31` 和 V2 `2.0.32`；声明范围不表示每个版本均已实测。详见 [package.json](../package.json)。
 - 源码安装需要 **Git、[Bun](https://bun.sh/) 和 [Node.js](https://nodejs.org/)**；npm 包和 ZIP 无需本地构建。
-- V1 用户可以升级到 `2.1.0`。如需保留旧安装，可继续使用 `1.0.1` 及其[对应指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)，无需为了 V1 兼容而固定旧版。
+- V1 用户可以升级到 `2.1.1`。如需保留旧安装，可继续使用 `1.0.1` 及其[对应指南](https://github.com/SolitudeRA/opencode-tui-context/blob/v1.0.1/README.zh-CN.md)，无需为了 V1 兼容而固定旧版。
 
 ### npm 安装
 
@@ -20,8 +20,8 @@
 
 | 宿主 | 命令 | 写入位置 |
 | --- | --- | --- |
-| V1 | `opencode plugin -g opencode-tui-context@2.1.0` | 全局 `tui.json` 的 `plugin` 数组 |
-| V2 | `opencode plugin add opencode-tui-context@2.1.0` | 全局 `cli.json` 的 `plugins` 数组 |
+| V1 | `opencode plugin -g opencode-tui-context@2.1.1` | 全局 `tui.json` 的 `plugin` 数组 |
+| V2 | `opencode plugin add opencode-tui-context@2.1.1` | 全局 `cli.json` 的 `plugins` 数组 |
 
 V1 去掉 `-g` 可安装到当前项目，详见 [V1 插件规范](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/opencode/specs/tui-plugins.md#package-manifest-and-install)。V2 只有全局 CLI 配置，详见 [V2 插件命令](https://opencode.ai/v2/docs/cli/commands/#plugin)。
 
@@ -135,7 +135,7 @@ local-plugins/opencode-tui-context/
 ```json
 {
   "plugin": [
-    ["opencode-tui-context@2.1.0", {
+    ["opencode-tui-context@2.1.1", {
       "barWidth": 24,
       "exclude": [],
       "showLegend": true
@@ -150,7 +150,7 @@ local-plugins/opencode-tui-context/
 {
   "plugins": [
     {
-      "package": "opencode-tui-context@2.1.0",
+      "package": "opencode-tui-context@2.1.1",
       "options": {
         "barWidth": 24,
         "exclude": [],
@@ -220,7 +220,7 @@ V2 通过 Solid 读取宿主响应式缓存，V1 根据宿主状态和事件刷�
 **V1 npm：**更新已有条目并保留元组选项：
 
 ```sh
-opencode plugin -g opencode-tui-context@2.1.0 --force
+opencode plugin -g opencode-tui-context@2.1.1 --force
 ```
 
 **V2 npm：**运行 `opencode plugin check` 检查可用更新。要指定某个已发布版本，只修改 `cli.json` 中本插件的 `package` 版本后缀，保留选项。宿主更新命令见 `opencode plugin update --help`。

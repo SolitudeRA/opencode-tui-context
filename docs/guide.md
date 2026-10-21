@@ -165,7 +165,7 @@ For ZIP or source installations, replace the package name with `"./local-plugins
 
 | Option | Type | Default | Behavior |
 | --- | --- | --- | --- |
-| `barWidth` | `number` | `24` | Initial **outer panel width** before measurement, rounded and clamped to `8–120`. The bars subtract four columns for borders and padding. Once measured, the panel follows the actual sidebar width. This does not set a fixed bar width. |
+| `barWidth` | `number` | `24` | Initial **outer panel width** before measurement, rounded and clamped to `8–120`. The bars subtract two columns of padding. Once measured, the panel follows the actual sidebar width. This does not set a fixed bar width. |
 | `exclude` | `string[]` | `[]` | Hide any of `cached`, `prompt`, `think`, `out`, `reserved`, or `free` and their legend entries. `used` cannot be hidden. |
 | `showLegend` | `boolean` | `true` | Show the two legend groups when space permits. `false` keeps the bars and title without legends. |
 

@@ -68,7 +68,7 @@ async function frame() {
 function includes(actual, expected, label) { assert(actual.includes(expected), `${label}: missing ${expected}\n${actual}`); }
 function bars(actual) {
   return actual.split("\n").flatMap((line) => {
-    const match = line.match(/^\s*│\s*([▓░]+)\s*│\s*$/u); return match ? [match[1]] : [];
+    const match = line.match(/^\s*([▓░]+)\s*$/u); return match ? [match[1]] : [];
   });
 }
 function fgFor(text) {
@@ -120,7 +120,7 @@ try {
 
   for (const width of [30, 12, 8, 70]) {
     setup.resize(width, 24); current = await frame();
-    assert.deepEqual(bars(current).map((bar) => bar.length), [width - 4, width - 4]);
+    assert.deepEqual(bars(current).map((bar) => bar.length), [width - 2, width - 2]);
     if (width === 12) { includes(current, "Context", "narrow title"); assert(!current.includes("% used")); }
     if (width === 8) assert(!current.includes("Context"));
   }

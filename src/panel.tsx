@@ -9,15 +9,15 @@ import { computeUsage, lastAssistantWithTokens, type AssistantUsage } from "./us
 export const BAR_FILLED = "\u2593"
 export const BAR_EMPTY = "\u2591"
 
-/** Bar cells available inside the frame: 1 border + 1 padding column on each side. Clamped at
- *  zero, never raised: a floor above the real content width would push rows past the frame. */
+/** Bar cells available inside the panel: 1 padding column on each side. Clamped at zero, never
+ *  raised: a floor above the real content width would push rows past the panel. */
 export function effectiveWidth(width: number): number {
-  return Math.max(0, width - 4)
+  return Math.max(0, width - 2)
 }
 
 export type ResolvedOptions = Required<PluginOptions_>
 /** Flat host-independent palette shared by bars and their legends. */
-export type Theme = Record<"primary" | "secondary" | "accent" | "success" | "warning" | "text" | "textMuted" | "borderSubtle", RGBA>
+export type Theme = Record<"primary" | "secondary" | "accent" | "success" | "warning" | "text" | "textMuted", RGBA>
 export type ThemeColorKey = keyof Theme
 export type ThemeColor = RGBA
 
@@ -30,7 +30,6 @@ export function resolveTheme(theme: Plugin.Context["theme"]): Theme {
     warning: theme.text.feedback.warning.base,
     text: theme.text.base,
     textMuted: theme.text.muted,
-    borderSubtle: theme.border.base,
   }
 }
 
@@ -225,8 +224,6 @@ export function UsagePanel(props: { usage: Usage | undefined; theme: Theme; conf
       id="opencode-tui-context-panel"
       flexDirection="column"
       gap={1}
-      border
-      borderColor={theme().borderSubtle}
       paddingLeft={1}
       paddingRight={1}
       ref={(element) => {

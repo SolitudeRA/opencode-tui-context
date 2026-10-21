@@ -51,7 +51,7 @@ function sentinelTheme(): Theme {
   const token = (): RGBA => RGBA.fromHex('#' + (++index).toString(16).padStart(6, '0'))
   return {
     primary: token(), secondary: token(), accent: token(), success: token(), warning: token(),
-    text: token(), textMuted: token(), borderSubtle: token(),
+    text: token(), textMuted: token(),
   }
 }
 
@@ -189,16 +189,20 @@ describe("compositionLegendItems", () => {
 })
 
 describe("panel width", () => {
-  test("subtracts the four frame columns from a 24-column panel", () => {
-    expect(effectiveWidth(24)).toBe(20)
+  test("subtracts the two padding columns from a 24-column panel", () => {
+    expect(effectiveWidth(24)).toBe(22)
   })
 
-  test("subtracts the four frame columns from an eight-column panel", () => {
-    expect(effectiveWidth(8)).toBe(4)
+  test("subtracts the two padding columns from an eight-column panel", () => {
+    expect(effectiveWidth(8)).toBe(6)
   })
 
   test("tracks a wide 200-column panel", () => {
-    expect(effectiveWidth(200)).toBe(196)
+    expect(effectiveWidth(200)).toBe(198)
+  })
+
+  test("clamps a panel narrower than its padding at zero", () => {
+    expect(effectiveWidth(1)).toBe(0)
   })
 })
 

@@ -115,7 +115,7 @@ function includes(actual, expected, label) {
 }
 function bars(actual) {
   return actual.split("\n").flatMap((line) => {
-    const match = line.match(/^\s*│\s*([▓░]+)\s*│\s*$/u);
+    const match = line.match(/^\s*([▓░]+)\s*$/u);
     return match ? [match[1]] : [];
   });
 }
@@ -136,7 +136,7 @@ try {
   includes(current, "u 2K", "total legend");
   includes(current, "c 800", "cache legend");
   // The composition allocator intentionally permits rounding slack (one cell here).
-  assert.deepEqual(bars(current).map((bar) => bar.length), [66, 65]);
+  assert.deepEqual(bars(current).map((bar) => bar.length), [68, 67]);
   setData("messages", "a", 0, "tokens", "output", 300);
   current = await frame();
   includes(current, "22% used", "in-place token update");
@@ -179,7 +179,7 @@ try {
   for (const width of [30, 12, 8, 70]) {
     setup.resize(width, 24);
     current = await frame();
-    assert.deepEqual(bars(current).map((bar) => bar.length), [width - 4, width - 4], `bar width at ${width}\n${current}`);
+    assert.deepEqual(bars(current).map((bar) => bar.length), [width - 2, width - 2], `bar width at ${width}\n${current}`);
     if (width === 12) {
       includes(current, "Context", "narrow title");
       assert.ok(!current.includes("% used"), `Percentage must hide when it cannot fit.\n${current}`);
